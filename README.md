@@ -83,3 +83,4 @@ Notes and security
 - Keep SMTP credentials out of source control.
 - For production, run behind TLS (HTTPS) and lock down origins.
 - Puppeteer can be resource-heavy; consider a headless Chrome service or rendering queue for high throughput.
+# customs
