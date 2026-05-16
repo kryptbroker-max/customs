@@ -83,4 +83,5 @@ Notes and security
 - Keep SMTP credentials out of source control.
 - For production, run behind TLS (HTTPS) and lock down origins.
 - Puppeteer can be resource-heavy; consider a headless Chrome service or rendering queue for high throughput.
+- On Render's free plan, the web service can spin down after inactivity. Use an external uptime monitor to ping `GET /health` every few minutes if you want to reduce cold starts.
 # customs

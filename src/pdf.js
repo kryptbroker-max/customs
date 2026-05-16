@@ -31,9 +31,11 @@ async function generatePdfFromHtml(html) {
 
     // Set a high viewport to ensure correct A4 rendering when converting to PDF.
     await page.setViewport({ width: 1200, height: 1700 });
+    page.setDefaultNavigationTimeout(60000);
 
-    // Use setContent which accepts an HTML string and waits for network to be idle.
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    // Render the document once the DOM is ready; waiting for network idle can hang on
+    // slower hosts or when the document includes long-lived browser activity.
+    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
     // Produce a crisp, print-ready A4 PDF.
     const pdfBuffer = await page.pdf({

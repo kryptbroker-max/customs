@@ -33,7 +33,13 @@ function getTransporter() {
     host,
     port,
     secure,
-    auth: { user, pass }
+    auth: { user, pass },
+    pool: true,
+    maxConnections: 1,
+    maxMessages: 20,
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 45000
   });
 
   return transporter;
@@ -70,8 +76,18 @@ async function sendMailWithAttachment(recipientEmail, subject, htmlBody, pdfBuff
     ]
   };
 
-  // returns the result of transporter.sendMail
-  return transporter.sendMail(mailOptions);
+  try {
+    // returns the result of transporter.sendMail
+    return await transporter.sendMail(mailOptions);
+  } catch (error) {
+    const wrapped = new Error(error && error.message ? `SMTP send failed: ${error.message}` : 'SMTP send failed');
+    wrapped.code = error && error.code ? error.code : 'SMTP_SEND_FAILED';
+    wrapped.stage = 'smtp-send';
+    wrapped.responseCode = error && error.responseCode ? error.responseCode : undefined;
+    wrapped.command = error && error.command ? error.command : undefined;
+    wrapped.response = error && error.response ? error.response : undefined;
+    throw wrapped;
+  }
 }
 
 module.exports = { sendMailWithAttachment };

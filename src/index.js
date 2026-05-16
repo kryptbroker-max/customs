@@ -142,14 +142,18 @@ app.post('/send', sendLimiter, async (req, res) => {
       });
     }
 
+    console.log(`Starting send for ${recipientEmail}`);
+
     // Generate the PDF buffer in memory
     let pdfBuffer;
     try {
+      const pdfStart = Date.now();
       pdfBuffer = await generatePdfFromHtml(htmlToConvert);
+      console.log(`PDF generated in ${Date.now() - pdfStart}ms`);
     } catch (pdfErr) {
       console.error('PDF generation failed:', pdfErr);
       const message = pdfErr && pdfErr.message ? pdfErr.message : 'PDF generation failed';
-      return res.status(500).json({ error: message });
+      return res.status(500).json({ error: message, stage: 'pdf-generation' });
     }
 
     const escapeHtml = value => String(value || '')
@@ -265,16 +269,37 @@ app.post('/send', sendLimiter, async (req, res) => {
       if (!logoDataUri) {
         console.log('⚠ No logo found - using fallback branding');
       }
+      const mailStart = Date.now();
       const info = await sendMailWithAttachment(recipientEmail, subject, coverHtml, pdfBuffer, 'notice.pdf');
+      console.log(`Email sent in ${Date.now() - mailStart}ms`);
       return res.json({ success: true, messageId: info && info.messageId });
     } catch (mailErr) {
-      console.error('SMTP send failed:', mailErr);
+      console.error('SMTP send failed:', {
+        message: mailErr && mailErr.message ? mailErr.message : 'SMTP send failed',
+        code: mailErr && mailErr.code ? mailErr.code : undefined,
+        stage: mailErr && mailErr.stage ? mailErr.stage : undefined,
+        responseCode: mailErr && mailErr.responseCode ? mailErr.responseCode : undefined,
+        command: mailErr && mailErr.command ? mailErr.command : undefined
+      });
       const message = mailErr && mailErr.message ? mailErr.message : 'SMTP send failed';
-      return res.status(500).json({ error: message });
+      return res.status(500).json({
+        error: message,
+        stage: mailErr && mailErr.stage ? mailErr.stage : 'smtp-send',
+        code: mailErr && mailErr.code ? mailErr.code : undefined,
+        responseCode: mailErr && mailErr.responseCode ? mailErr.responseCode : undefined,
+        command: mailErr && mailErr.command ? mailErr.command : undefined
+      });
     }
   } catch (err) {
-    console.error('Error in /send:', err);
-    return res.status(500).json({ error: err && err.message ? err.message : 'Internal server error' });
+    console.error('Error in /send:', {
+      message: err && err.message ? err.message : 'Internal server error',
+      code: err && err.code ? err.code : undefined,
+      stage: err && err.stage ? err.stage : undefined
+    });
+    return res.status(500).json({
+      error: err && err.message ? err.message : 'Internal server error',
+      stage: err && err.stage ? err.stage : 'request'
+    });
   }
 });
 
