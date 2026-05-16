@@ -37,8 +37,8 @@ Example `.env` values:
 ```text
 PORT=3000
 SMTP_HOST=smtp.zoho.com
-SMTP_PORT=587
-SMTP_SECURE=false
+SMTP_PORT=465
+SMTP_SECURE=true
 SMTP_USER=customs@ukborderforce.site
 SMTP_PASS=your_zoho_app_password
 FROM_EMAIL="Border Force <customs@ukborderforce.site>"
