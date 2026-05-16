@@ -24,6 +24,9 @@ app.use(helmet({
 }));
 app.use(express.json({ limit: '2mb' }));
 
+// Trust proxy headers from Render's load balancer for accurate rate limiting
+app.set('trust proxy', 1);
+
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use('/img', express.static(path.join(__dirname, '..', 'img')));
