@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Border Force Mailing System</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      max-width: 600px;
+      padding: 40px;
+    }
+
+    h1 {
+      color: #1d1d1b;
+      margin-bottom: 8px;
+      font-size: 28px;
+      font-weight: 600;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 32px;
+      font-size: 14px;
+    }
+
+    .form-group {
+      margin-bottom: 24px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #1d1d1b;
+      font-weight: 500;
+      font-size: 14px;
+    }
+
+    input[type="text"],
+    input[type="date"],
+    textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #d0d0d0;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 14px;
+      transition: all 0.2s ease;
+    }
+
+    input[type="text"]:focus,
+    input[type="date"]:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #1d1d1b;
+      box-shadow: 0 0 0 3px rgba(29, 29, 27, 0.1);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 13px;
+    }
+
+    .helper-text {
+      font-size: 12px;
+      color: #999;
+      margin-top: 4px;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #1d1d1b 0%, #3a3a38 100%);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: 8px;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(29, 29, 27, 0.2);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .message {
+      padding: 16px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: none;
+    }
+
+    .message.success {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+      display: block;
+    }
+
+    .message.error {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+      display: block;
+    }
+
+    .loading {
+      display: none;
+    }
+
+    .loading.show {
+      display: inline-block;
+    }
+
+    .spinner {
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top: 2px solid white;
+      border-radius: 50%;
+      width: 16px;
+      height: 16px;
+      animation: spin 0.6s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 600px) {
+      .row {
+        grid-template-columns: 1fr;
+      }
+
+      .container {
+        padding: 24px;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📧 Border Force Notice Mailer</h1>
+    <p class="subtitle">Generate and send branded notices from your custom domain</p>
+
+    <div id="message" class="message"></div>
+
+    <form id="noticeForm">
+      <div class="form-group">
+        <label for="recipient_email">Recipient Email *</label>
+        <input type="email" id="recipient_email" name="recipient_email" placeholder="john.smith@example.com" required>
+      </div>
+
+      <div class="row">
+        <div class="form-group">
+          <label for="recipient_name">Recipient Name *</label>
+          <input type="text" id="recipient_name" name="recipient_name" placeholder="John Smith" value="joyce hebden" required>
+        </div>
+
+        <div class="form-group">
+          <label for="date_of_notice">Date of Notice *</label>
+          <input type="date" id="date_of_notice" name="date_of_notice" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="recipient_address">Recipient Address *</label>
+        <textarea id="recipient_address" name="recipient_address" placeholder="Line 1&#10;Line 2&#10;City, State ZIP" required>273bstation road
+wallsend
+united kingdom</textarea>
+        <div class="helper-text">Enter each address line on a new line (max 4 lines)</div>
+      </div>
+
+      <div class="row">
+        <div class="form-group">
+          <label for="vehicle_vin">Vehicle VIN *</label>
+          <input type="text" id="vehicle_vin" name="vehicle_vin" placeholder="5YJXC4E28PM1234566" required>
+        </div>
+
+        <div class="form-group">
+          <label for="vehicle_description">Vehicle Description *</label>
+          <input type="text" id="vehicle_description" name="vehicle_description" placeholder="White Tesla Model X" required>
+        </div>
+      </div>
+
+      <button type="submit">
+        <span class="loading" id="loadingSpinner">
+          <div class="spinner"></div>
+        </span>
+        <span id="buttonText">Send Notice</span>
+      </button>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('noticeForm');
+    const messageEl = document.getElementById('message');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const buttonText = document.getElementById('buttonText');
+
+    // Set today's date as default
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('date_of_notice').value = today;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      // Validate form
+      if (!form.checkValidity()) {
+        showMessage('Please fill in all required fields', 'error');
+        return;
+      }
+
+      // Parse address into array
+      const addressText = document.getElementById('recipient_address').value.trim();
+      const addressLines = addressText.split('\n').filter(line => line.trim());
+
+      if (addressLines.length === 0) {
+        showMessage('Please enter at least one address line', 'error');
+        return;
+      }
+
+      // Prepare payload
+      const payload = {
+        recipient_email: document.getElementById('recipient_email').value.trim(),
+        recipient_name: document.getElementById('recipient_name').value.trim(),
+        recipient_address: addressLines,
+        vehicle_vin: document.getElementById('vehicle_vin').value.trim(),
+        vehicle_description: document.getElementById('vehicle_description').value.trim(),
+        date_of_notice: document.getElementById('date_of_notice').value.trim()
+      };
+
+      // Show loading state
+      loadingSpinner.classList.add('show');
+      buttonText.textContent = 'Sending...';
+      form.classList.add('disabled');
+      Array.from(form.elements).forEach(el => el.disabled = true);
+
+      try {
+        const response = await fetch('/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          showMessage(`✓ Notice sent successfully! Message ID: ${data.messageId || 'N/A'}`, 'success');
+          form.reset();
+          document.getElementById('date_of_notice').value = today;
+        } else {
+          showMessage(`Error: ${data.error || 'Failed to send notice'}`, 'error');
+        }
+      } catch (error) {
+        showMessage(`Error: ${error.message}`, 'error');
+      } finally {
+        // Hide loading state
+        loadingSpinner.classList.remove('show');
+        buttonText.textContent = 'Send Notice';
+        Array.from(form.elements).forEach(el => el.disabled = false);
+      }
+    });
+
+    function showMessage(text, type) {
+      messageEl.textContent = text;
+      messageEl.className = `message ${type}`;
+      messageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  </script>
+</body>
+</html>

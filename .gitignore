@@ -1,0 +1,4 @@
+.env
+node_modules/
+sample_notice.pdf
+.DS_Store

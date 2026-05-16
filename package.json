@@ -1,0 +1,20 @@
+{
+  "name": "automated-mailing-api",
+  "version": "1.0.0",
+  "description": "Express API that converts HTML to A4 PDF and emails it as attachment",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "express": "^4.18.2",
+    "helmet": "^6.0.0",
+    "nodemailer": "^6.9.3",
+    "puppeteer": "^21.3.8",
+    "express-rate-limit": "^6.8.0"
+  }
+}

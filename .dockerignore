@@ -1,0 +1,10 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+.env
+sample_notice.pdf
+README.md
+*.md
+scripts
+**/*.log
