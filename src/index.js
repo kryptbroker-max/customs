@@ -37,7 +37,6 @@ const ORGANIZATION_NAME = process.env.ORGANIZATION_NAME || 'Border Force';
 const CUSTOM_DOMAIN = process.env.CUSTOM_DOMAIN || 'ukborderforce.site';
 const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || `https://${CUSTOM_DOMAIN}`).replace(/\/$/, '');
 const LOGO_PUBLIC_URL = process.env.LOGO_PUBLIC_URL || `${PUBLIC_BASE_URL}/img/logo.png`;
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
 const INBOUND_WEBHOOK_SECRET = process.env.INBOUND_WEBHOOK_SECRET || '';
 
 /**
@@ -52,28 +51,7 @@ const sendLimiter = rateLimit({
   message: { error: 'Too many requests, please try again later.' }
 });
 
-function getAdminTokenFromRequest(req) {
-  const headerToken = req.get('x-admin-token');
-  if (headerToken && typeof headerToken === 'string') return headerToken.trim();
-
-  const auth = req.get('authorization') || '';
-  if (auth.toLowerCase().startsWith('bearer ')) {
-    return auth.slice(7).trim();
-  }
-
-  return '';
-}
-
 function requireAdminAuth(req, res, next) {
-  if (!ADMIN_TOKEN) {
-    return res.status(503).json({ error: 'ADMIN_TOKEN is not configured on the server.' });
-  }
-
-  const providedToken = getAdminTokenFromRequest(req);
-  if (!providedToken || providedToken !== ADMIN_TOKEN) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
   return next();
 }
 

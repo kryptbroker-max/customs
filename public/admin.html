@@ -28,14 +28,6 @@
       margin: 0;
       font-size: 24px;
     }
-    .token-row {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-    .token-input {
-      width: 280px;
-    }
     input, textarea, button {
       font: inherit;
     }
@@ -145,11 +137,7 @@
   <div class="app">
     <div class="header">
       <h1>Inbox Admin</h1>
-      <div class="token-row">
-        <input id="tokenInput" class="token-input" type="password" placeholder="Enter ADMIN_TOKEN" />
-        <button id="saveTokenBtn" class="secondary">Save Token</button>
-        <button id="refreshBtn">Refresh</button>
-      </div>
+      <button id="refreshBtn">Refresh</button>
     </div>
 
     <div class="status" id="status"></div>
@@ -188,8 +176,6 @@
 
   <script>
     const statusEl = document.getElementById('status');
-    const tokenInput = document.getElementById('tokenInput');
-    const saveTokenBtn = document.getElementById('saveTokenBtn');
     const refreshBtn = document.getElementById('refreshBtn');
     const messageListEl = document.getElementById('messageList');
     const detailEmpty = document.getElementById('detailEmpty');
@@ -207,24 +193,14 @@
     let messages = [];
     let selectedId = null;
 
-    tokenInput.value = localStorage.getItem('adminToken') || '';
-
-    function getToken() {
-      return (localStorage.getItem('adminToken') || '').trim();
-    }
-
     function setStatus(text, isError = false) {
       statusEl.textContent = text;
       statusEl.style.color = isError ? '#9c1f1f' : '#1a5b2a';
     }
 
     async function api(path, options = {}) {
-      const token = getToken();
-      if (!token) throw new Error('Set ADMIN_TOKEN first.');
-
       const headers = {
         'Content-Type': 'application/json',
-        'x-admin-token': token,
         ...(options.headers || {})
       };
 
@@ -307,11 +283,6 @@
       renderDetail(data.message);
     }
 
-    saveTokenBtn.addEventListener('click', () => {
-      localStorage.setItem('adminToken', tokenInput.value.trim());
-      setStatus('Token saved.');
-    });
-
     refreshBtn.addEventListener('click', async () => {
       try {
         await loadMessages();
@@ -344,11 +315,7 @@
       }
     });
 
-    if (getToken()) {
-      loadMessages().catch(err => setStatus(err.message, true));
-    } else {
-      setStatus('Enter ADMIN_TOKEN and click Save Token to start.', true);
-    }
+    loadMessages().catch(err => setStatus(err.message, true));
   </script>
 </body>
 </html>
