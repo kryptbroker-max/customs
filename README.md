@@ -2,6 +2,11 @@
 
 This small Node.js + Express service converts incoming HTML into an A4 PDF (print-ready) and emails it as a secure attachment. It is configured to use Resend over HTTPS.
 
+It also includes a website inbox workflow:
+- Receive inbound email through a webhook endpoint
+- View messages from a secure admin inbox page
+- Reply to received messages from the website
+
 Installation
 
 1. Clone or place the project locally and cd into the folder:
@@ -29,8 +34,12 @@ Create a `.env` from `.env.example` and fill in email API credentials. Required 
 - `PORT` (optional)
 - `RESEND_API_KEY`
 - `FROM_EMAIL`
+- `ADMIN_TOKEN` (required for admin inbox access)
 - `CUSTOM_DOMAIN`
 - `ORGANIZATION_NAME`
+
+Optional env vars:
+- `INBOUND_WEBHOOK_SECRET` (recommended to protect inbound webhook calls)
 
 Example `.env` values:
 
@@ -38,6 +47,8 @@ Example `.env` values:
 PORT=3000
 RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 FROM_EMAIL="Border Force <customs@ukborderforce.site>"
+ADMIN_TOKEN=change-this-long-random-token
+INBOUND_WEBHOOK_SECRET=optional-webhook-secret
 CUSTOM_DOMAIN=ukborderforce.site
 ORGANIZATION_NAME=Border Force
 ```
@@ -64,8 +75,35 @@ Body (JSON):
 Response on success:
 
 ```json
-{ "success": true, "messageId": "<SMTP message id>" }
+{ "success": true, "messageId": "<provider message id>" }
 ```
+
+POST /inbound/email
+
+Accepts inbound email webhook payloads and stores them to the inbox store.
+If `INBOUND_WEBHOOK_SECRET` is configured, include header `x-webhook-secret`.
+
+Example payload:
+
+```json
+{
+  "from": "sender@example.com",
+  "to": "customs@ukborderforce.site",
+  "subject": "Question about notice",
+  "text": "Hello, can you confirm this case?",
+  "message_id": "<abc123@example.com>"
+}
+```
+
+Admin inbox endpoints (token-protected)
+- `GET /admin`
+- `GET /admin/api/messages`
+- `GET /admin/api/messages/:id`
+- `POST /admin/api/messages/:id/reply`
+
+Use either of these headers for admin auth:
+- `x-admin-token: <ADMIN_TOKEN>`
+- `Authorization: Bearer <ADMIN_TOKEN>`
 
 Test with curl (replace values and ensure `.env` is configured):
 
@@ -77,6 +115,9 @@ curl -X POST http://localhost:3000/send \
 
 Notes and security
 - Keep API credentials out of source control.
+- Set a strong `ADMIN_TOKEN` in production.
+- Protect `/inbound/email` with `INBOUND_WEBHOOK_SECRET`.
+- Inbox data is stored in `data/inbox.json` and should not be committed.
 - For production, run behind TLS (HTTPS) and lock down origins.
 - Puppeteer can be resource-heavy; consider a headless Chrome service or rendering queue for high throughput.
 - On Render's free plan, the web service can spin down after inactivity. Use an external uptime monitor to ping `GET /health` every few minutes if you want to reduce cold starts.

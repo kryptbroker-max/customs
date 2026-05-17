@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inbox Admin</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: #f3f5f8;
+      color: #152238;
+    }
+    .app {
+      max-width: 1100px;
+      margin: 24px auto;
+      padding: 0 16px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+    .token-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .token-input {
+      width: 280px;
+    }
+    input, textarea, button {
+      font: inherit;
+    }
+    input[type="password"], input[type="text"], textarea {
+      width: 100%;
+      border: 1px solid #cdd5df;
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #fff;
+    }
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 10px 14px;
+      background: #1f4a7c;
+      color: #fff;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button.secondary {
+      background: #5e6f84;
+    }
+    button:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+    .panel {
+      background: #fff;
+      border: 1px solid #d6deea;
+      border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(20, 32, 50, 0.08);
+      padding: 14px;
+    }
+    .panel h3 {
+      margin-top: 0;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 12px;
+    }
+    .message-list {
+      max-height: 70vh;
+      overflow: auto;
+    }
+    .message-item {
+      border: 1px solid #dbe3ef;
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      background: #f9fbff;
+    }
+    .message-item.active {
+      border-color: #1f4a7c;
+      background: #edf4ff;
+    }
+    .meta {
+      color: #4f6077;
+      font-size: 12px;
+    }
+    .subject {
+      margin: 4px 0;
+      font-weight: 700;
+    }
+    .preview {
+      color: #47586f;
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .detail pre {
+      white-space: pre-wrap;
+      background: #f8fafc;
+      border: 1px solid #dbe5f0;
+      border-radius: 8px;
+      padding: 12px;
+      max-height: 250px;
+      overflow: auto;
+    }
+    .muted {
+      color: #5b6f88;
+      font-size: 13px;
+    }
+    .status {
+      margin: 10px 0;
+      min-height: 20px;
+      font-size: 13px;
+    }
+    .reply-box textarea {
+      min-height: 120px;
+      margin-top: 6px;
+      margin-bottom: 8px;
+      resize: vertical;
+    }
+    .hidden {
+      display: none;
+    }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .message-list { max-height: 300px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <h1>Inbox Admin</h1>
+      <div class="token-row">
+        <input id="tokenInput" class="token-input" type="password" placeholder="Enter ADMIN_TOKEN" />
+        <button id="saveTokenBtn" class="secondary">Save Token</button>
+        <button id="refreshBtn">Refresh</button>
+      </div>
+    </div>
+
+    <div class="status" id="status"></div>
+
+    <div class="layout">
+      <div class="panel">
+        <h3>Messages</h3>
+        <div id="messageList" class="message-list"></div>
+      </div>
+
+      <div class="panel detail">
+        <h3>Message Detail</h3>
+        <div id="detailEmpty" class="muted">Select a message to view and reply.</div>
+        <div id="detailBody" class="hidden">
+          <p><strong>From:</strong> <span id="from"></span></p>
+          <p><strong>To:</strong> <span id="to"></span></p>
+          <p><strong>Subject:</strong> <span id="subject"></span></p>
+          <p><strong>Received:</strong> <span id="receivedAt"></span></p>
+
+          <h4>Text</h4>
+          <pre id="text"></pre>
+
+          <h4>Reply</h4>
+          <div class="reply-box">
+            <input id="replySubject" type="text" placeholder="Reply subject" />
+            <textarea id="replyText" placeholder="Type your reply"></textarea>
+            <button id="sendReplyBtn">Send Reply</button>
+          </div>
+
+          <h4>Sent Replies</h4>
+          <div id="replies" class="muted">No replies yet.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const tokenInput = document.getElementById('tokenInput');
+    const saveTokenBtn = document.getElementById('saveTokenBtn');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const messageListEl = document.getElementById('messageList');
+    const detailEmpty = document.getElementById('detailEmpty');
+    const detailBody = document.getElementById('detailBody');
+    const fromEl = document.getElementById('from');
+    const toEl = document.getElementById('to');
+    const subjectEl = document.getElementById('subject');
+    const receivedAtEl = document.getElementById('receivedAt');
+    const textEl = document.getElementById('text');
+    const repliesEl = document.getElementById('replies');
+    const replySubjectEl = document.getElementById('replySubject');
+    const replyTextEl = document.getElementById('replyText');
+    const sendReplyBtn = document.getElementById('sendReplyBtn');
+
+    let messages = [];
+    let selectedId = null;
+
+    tokenInput.value = localStorage.getItem('adminToken') || '';
+
+    function getToken() {
+      return (localStorage.getItem('adminToken') || '').trim();
+    }
+
+    function setStatus(text, isError = false) {
+      statusEl.textContent = text;
+      statusEl.style.color = isError ? '#9c1f1f' : '#1a5b2a';
+    }
+
+    async function api(path, options = {}) {
+      const token = getToken();
+      if (!token) throw new Error('Set ADMIN_TOKEN first.');
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-admin-token': token,
+        ...(options.headers || {})
+      };
+
+      const response = await fetch(path, { ...options, headers });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || 'Request failed');
+      }
+      return data;
+    }
+
+    function renderList() {
+      messageListEl.innerHTML = '';
+      if (!messages.length) {
+        messageListEl.innerHTML = '<div class="muted">No inbound messages yet.</div>';
+        return;
+      }
+
+      for (const msg of messages) {
+        const item = document.createElement('div');
+        item.className = 'message-item' + (msg.id === selectedId ? ' active' : '');
+        item.innerHTML = `
+          <div class="meta">${new Date(msg.receivedAt).toLocaleString()}</div>
+          <div class="subject">${msg.subject || '(no subject)'}</div>
+          <div class="meta">${msg.from || 'Unknown sender'}</div>
+          <div class="preview">${msg.textPreview || ''}</div>
+        `;
+        item.addEventListener('click', () => selectMessage(msg.id));
+        messageListEl.appendChild(item);
+      }
+    }
+
+    function renderDetail(message) {
+      if (!message) {
+        detailEmpty.style.display = 'block';
+        detailBody.style.display = 'none';
+        return;
+      }
+
+      detailEmpty.style.display = 'none';
+      detailBody.style.display = 'block';
+      fromEl.textContent = message.from || '';
+      toEl.textContent = message.to || '';
+      subjectEl.textContent = message.subject || '';
+      receivedAtEl.textContent = new Date(message.receivedAt).toLocaleString();
+      textEl.textContent = message.text || '(no text body)';
+
+      const defaultReplySubject = message.subject && message.subject.toLowerCase().startsWith('re:')
+        ? message.subject
+        : `Re: ${message.subject || '(no subject)'}`;
+      replySubjectEl.value = defaultReplySubject;
+      replyTextEl.value = '';
+
+      const replies = Array.isArray(message.replies) ? message.replies : [];
+      if (!replies.length) {
+        repliesEl.innerHTML = '<span class="muted">No replies yet.</span>';
+      } else {
+        repliesEl.innerHTML = replies.map(r => {
+          const sentAt = r.sentAt ? new Date(r.sentAt).toLocaleString() : '';
+          return `<div style="border:1px solid #dbe5f0;border-radius:8px;padding:8px;margin-bottom:6px;background:#f8fbff;"><div><strong>${r.subject || '(no subject)'}</strong></div><div class="meta">To: ${r.to || ''} | ${sentAt}</div><div class="meta">Message ID: ${r.messageId || ''}</div></div>`;
+        }).join('');
+      }
+    }
+
+    async function loadMessages() {
+      setStatus('Loading inbox...');
+      const data = await api('/admin/api/messages');
+      messages = data.messages || [];
+      renderList();
+      if (selectedId) {
+        await selectMessage(selectedId, false);
+      }
+      setStatus(`Loaded ${messages.length} message(s).`);
+    }
+
+    async function selectMessage(id, updateList = true) {
+      selectedId = id;
+      if (updateList) renderList();
+      const data = await api(`/admin/api/messages/${encodeURIComponent(id)}`);
+      renderDetail(data.message);
+    }
+
+    saveTokenBtn.addEventListener('click', () => {
+      localStorage.setItem('adminToken', tokenInput.value.trim());
+      setStatus('Token saved.');
+    });
+
+    refreshBtn.addEventListener('click', async () => {
+      try {
+        await loadMessages();
+      } catch (error) {
+        setStatus(error.message, true);
+      }
+    });
+
+    sendReplyBtn.addEventListener('click', async () => {
+      if (!selectedId) return;
+      const text = replyTextEl.value.trim();
+      const subject = replySubjectEl.value.trim();
+      if (!text) {
+        setStatus('Reply body is required.', true);
+        return;
+      }
+
+      sendReplyBtn.disabled = true;
+      try {
+        const result = await api(`/admin/api/messages/${encodeURIComponent(selectedId)}/reply`, {
+          method: 'POST',
+          body: JSON.stringify({ subject, text })
+        });
+        setStatus(`Reply sent. Message ID: ${result.messageId}`);
+        await selectMessage(selectedId, false);
+      } catch (error) {
+        setStatus(error.message, true);
+      } finally {
+        sendReplyBtn.disabled = false;
+      }
+    });
+
+    if (getToken()) {
+      loadMessages().catch(err => setStatus(err.message, true));
+    } else {
+      setStatus('Enter ADMIN_TOKEN and click Save Token to start.', true);
+    }
+  </script>
+</body>
+</html>

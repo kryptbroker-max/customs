@@ -6,8 +6,9 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
 const { generatePdfFromHtml } = require('./pdf');
-const { sendMailWithAttachment } = require('./email');
+const { sendMailWithAttachment, sendMail } = require('./email');
 const { generateNoticeHtml } = require('./template');
+const { listMessages, getMessageById, addInboundMessage, addReply } = require('./inboxStore');
 const fs = require('fs');
 const path = require('path');
 
@@ -36,6 +37,8 @@ const ORGANIZATION_NAME = process.env.ORGANIZATION_NAME || 'Border Force';
 const CUSTOM_DOMAIN = process.env.CUSTOM_DOMAIN || 'ukborderforce.site';
 const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || `https://${CUSTOM_DOMAIN}`).replace(/\/$/, '');
 const LOGO_PUBLIC_URL = process.env.LOGO_PUBLIC_URL || `${PUBLIC_BASE_URL}/img/logo.png`;
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
+const INBOUND_WEBHOOK_SECRET = process.env.INBOUND_WEBHOOK_SECRET || '';
 
 /**
  * Rate limiter to prevent abuse of the /send endpoint.
@@ -48,6 +51,78 @@ const sendLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later.' }
 });
+
+function getAdminTokenFromRequest(req) {
+  const headerToken = req.get('x-admin-token');
+  if (headerToken && typeof headerToken === 'string') return headerToken.trim();
+
+  const auth = req.get('authorization') || '';
+  if (auth.toLowerCase().startsWith('bearer ')) {
+    return auth.slice(7).trim();
+  }
+
+  return '';
+}
+
+function requireAdminAuth(req, res, next) {
+  if (!ADMIN_TOKEN) {
+    return res.status(503).json({ error: 'ADMIN_TOKEN is not configured on the server.' });
+  }
+
+  const providedToken = getAdminTokenFromRequest(req);
+  if (!providedToken || providedToken !== ADMIN_TOKEN) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  return next();
+}
+
+function normalizeEmailAddress(input) {
+  if (!input || typeof input !== 'string') return '';
+  const match = input.match(/<([^>]+)>/);
+  if (match && match[1]) return match[1].trim();
+  return input.trim();
+}
+
+function parseInboundPayload(body) {
+  const payload = body || {};
+  const data = payload.data || payload.email || payload;
+  const headers = data.headers || payload.headers || {};
+
+  const messageId =
+    data.message_id ||
+    data.messageId ||
+    headers['message-id'] ||
+    headers['Message-Id'] ||
+    headers['Message-ID'] ||
+    '';
+
+  const inReplyTo =
+    data.in_reply_to ||
+    data.inReplyTo ||
+    headers['in-reply-to'] ||
+    headers['In-Reply-To'] ||
+    '';
+
+  const references =
+    data.references ||
+    headers.references ||
+    headers.References ||
+    '';
+
+  return {
+    from: data.from || data.sender || payload.from || '',
+    to: data.to || payload.to || '',
+    subject: data.subject || payload.subject || '(no subject)',
+    text: data.text || data.text_body || data.plain || payload.text || '',
+    html: data.html || data.html_body || payload.html || '',
+    messageId: messageId ? String(messageId).trim() : '',
+    inReplyTo: inReplyTo ? String(inReplyTo).trim() : '',
+    references: references ? String(references).trim() : '',
+    receivedAt: new Date().toISOString(),
+    raw: payload
+  };
+}
 
 /**
  * POST /send
@@ -300,6 +375,103 @@ app.post('/send', sendLimiter, async (req, res) => {
       error: err && err.message ? err.message : 'Internal server error',
       stage: err && err.stage ? err.stage : 'request'
     });
+  }
+});
+
+app.post('/inbound/email', async (req, res) => {
+  try {
+    if (INBOUND_WEBHOOK_SECRET) {
+      const providedSecret = req.get('x-webhook-secret') || '';
+      if (providedSecret !== INBOUND_WEBHOOK_SECRET) {
+        return res.status(401).json({ error: 'Invalid webhook secret' });
+      }
+    }
+
+    const inbound = parseInboundPayload(req.body);
+
+    if (!inbound.from) {
+      return res.status(400).json({ error: 'Inbound payload is missing sender information.' });
+    }
+
+    const saved = addInboundMessage(inbound);
+    return res.status(200).json({ success: true, id: saved.id });
+  } catch (error) {
+    return res.status(500).json({ error: error && error.message ? error.message : 'Failed to process inbound email' });
+  }
+});
+
+app.get('/admin', (req, res) => {
+  res.sendFile(path.resolve(__dirname, '..', 'public', 'admin.html'));
+});
+
+app.get('/admin/api/messages', requireAdminAuth, (req, res) => {
+  const messages = listMessages().map(message => ({
+    id: message.id,
+    from: message.from,
+    to: message.to,
+    subject: message.subject,
+    textPreview: (message.text || '').slice(0, 180),
+    receivedAt: message.receivedAt,
+    replyCount: Array.isArray(message.replies) ? message.replies.length : 0
+  }));
+
+  return res.json({ messages });
+});
+
+app.get('/admin/api/messages/:id', requireAdminAuth, (req, res) => {
+  const message = getMessageById(req.params.id);
+  if (!message) return res.status(404).json({ error: 'Message not found' });
+  return res.json({ message });
+});
+
+app.post('/admin/api/messages/:id/reply', requireAdminAuth, async (req, res) => {
+  try {
+    const message = getMessageById(req.params.id);
+    if (!message) return res.status(404).json({ error: 'Message not found' });
+
+    const bodyText = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+    const bodyHtml = typeof req.body?.html === 'string' ? req.body.html.trim() : '';
+    if (!bodyText && !bodyHtml) {
+      return res.status(400).json({ error: 'Provide text or html for the reply body.' });
+    }
+
+    const toEmail = normalizeEmailAddress(message.from);
+    if (!toEmail) {
+      return res.status(400).json({ error: 'Unable to resolve recipient email from inbound message.' });
+    }
+
+    const defaultSubject = message.subject.toLowerCase().startsWith('re:')
+      ? message.subject
+      : `Re: ${message.subject}`;
+    const subject = typeof req.body?.subject === 'string' && req.body.subject.trim()
+      ? req.body.subject.trim()
+      : defaultSubject;
+
+    const html = bodyHtml || `<div style="white-space:pre-wrap;">${bodyText.replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[c]))}</div>`;
+    const text = bodyText || bodyHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
+    const references = [message.references, message.messageId].filter(Boolean).join(' ').trim();
+
+    const sent = await sendMail({
+      to: toEmail,
+      subject,
+      html,
+      text,
+      inReplyTo: message.messageId || undefined,
+      references: references || undefined
+    });
+
+    const savedReply = addReply(message.id, {
+      to: toEmail,
+      subject,
+      text,
+      html,
+      messageId: sent.messageId
+    });
+
+    return res.json({ success: true, messageId: sent.messageId, reply: savedReply });
+  } catch (error) {
+    return res.status(500).json({ error: error && error.message ? error.message : 'Failed to send reply' });
   }
 });
 
