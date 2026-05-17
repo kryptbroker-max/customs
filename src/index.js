@@ -8,7 +8,7 @@ const rateLimit = require('express-rate-limit');
 const { generatePdfFromHtml } = require('./pdf');
 const { sendMailWithAttachment, sendMail } = require('./email');
 const { generateNoticeHtml } = require('./template');
-const { listMessages, getMessageById, addInboundMessage, addReply } = require('./inboxStore');
+const { listMessages, listThreads, getMessageById, findMessageByMessageId, addInboundMessage, addOutboundMessage, addReply } = require('./inboxStore');
 const fs = require('fs');
 const path = require('path');
 
@@ -99,6 +99,27 @@ function parseInboundPayload(body) {
     references: references ? String(references).trim() : '',
     receivedAt: new Date().toISOString(),
     raw: payload
+  };
+}
+
+function buildReplyThreadMetadata(inboundMessage) {
+  const anchor = findMessageByMessageId(inboundMessage.inReplyTo) ||
+    String(inboundMessage.references || '')
+      .split(/\s+/)
+      .filter(Boolean)
+      .map(findMessageByMessageId)
+      .find(Boolean);
+
+  if (!anchor) {
+    return {
+      threadId: inboundMessage.messageId || undefined,
+      parentId: undefined
+    };
+  }
+
+  return {
+    threadId: anchor.threadId || anchor.messageId || anchor.id || inboundMessage.messageId || undefined,
+    parentId: anchor.id || undefined
   };
 }
 
@@ -324,6 +345,23 @@ app.post('/send', sendLimiter, async (req, res) => {
       }
       const mailStart = Date.now();
       const info = await sendMailWithAttachment(recipientEmail, subject, coverHtml, pdfBuffer, 'notice.pdf');
+      addOutboundMessage({
+        to: recipientEmail,
+        subject,
+        text: coverHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+        html: coverHtml,
+        messageId: info && info.messageId ? info.messageId : '',
+        threadId: info && info.messageId ? info.messageId : undefined,
+        raw: {
+          recipientEmail,
+          htmlContent: htmlToConvert,
+          date_of_notice,
+          vehicle_vin,
+          vehicle_description,
+          recipient_name,
+          recipient_address
+        }
+      });
       console.log(`Email sent in ${Date.now() - mailStart}ms`);
       return res.json({ success: true, messageId: info && info.messageId });
     } catch (mailErr) {
@@ -366,12 +404,17 @@ app.post('/inbound/email', async (req, res) => {
     }
 
     const inbound = parseInboundPayload(req.body);
+    const threadMeta = buildReplyThreadMetadata(inbound);
 
     if (!inbound.from) {
       return res.status(400).json({ error: 'Inbound payload is missing sender information.' });
     }
 
-    const saved = addInboundMessage(inbound);
+    const saved = addInboundMessage({
+      ...inbound,
+      threadId: threadMeta.threadId,
+      parentId: threadMeta.parentId
+    });
     return res.status(200).json({ success: true, id: saved.id });
   } catch (error) {
     return res.status(500).json({ error: error && error.message ? error.message : 'Failed to process inbound email' });
@@ -385,6 +428,9 @@ app.get('/admin', (req, res) => {
 app.get('/admin/api/messages', requireAdminAuth, (req, res) => {
   const messages = listMessages().map(message => ({
     id: message.id,
+    direction: message.direction,
+    threadId: message.threadId,
+    parentId: message.parentId || null,
     from: message.from,
     to: message.to,
     subject: message.subject,
@@ -393,7 +439,10 @@ app.get('/admin/api/messages', requireAdminAuth, (req, res) => {
     replyCount: Array.isArray(message.replies) ? message.replies.length : 0
   }));
 
-  return res.json({ messages });
+  return res.json({
+    messages,
+    threads: listThreads()
+  });
 });
 
 app.get('/admin/api/messages/:id', requireAdminAuth, (req, res) => {
@@ -437,6 +486,21 @@ app.post('/admin/api/messages/:id/reply', requireAdminAuth, async (req, res) => 
       text,
       inReplyTo: message.messageId || undefined,
       references: references || undefined
+    });
+
+    addOutboundMessage({
+      to: toEmail,
+      subject,
+      text,
+      html,
+      messageId: sent.messageId,
+      threadId: message.threadId || message.messageId || message.id,
+      parentId: message.id,
+      raw: {
+        source: 'admin-reply',
+        inboundMessageId: message.id,
+        inboundMessageIdHeader: message.messageId || null
+      }
     });
 
     const savedReply = addReply(message.id, {
