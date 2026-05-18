@@ -99,8 +99,8 @@ function parseInboundPayload(body) {
     from: data.from || data.sender || payload.from || '',
     to: data.to || payload.to || '',
     subject: data.subject || payload.subject || '(no subject)',
-    text: data.text || data.text_body || data.plain_text || data.plain || payload.text || payload.text_body || '',
-    html: data.html || data.html_body || payload.html || payload.html_body || '',
+    text: String(data.text || data.text_body || data.plain_text || data.plain || payload.text || payload.text_body || '').trim(),
+    html: String(data.html || data.html_body || payload.html || payload.html_body || '').trim(),
     messageId: messageId ? String(messageId).trim().replace(/^<|>$/g, '') : '',
     inReplyTo: inReplyTo ? String(inReplyTo).trim().replace(/^<|>$/g, '') : '',
     references: references ? String(references).trim().replace(/^<|>$/g, '') : '',
@@ -392,6 +392,19 @@ app.post('/inbound/email', async (req, res) => {
     }
 
     const inbound = parseInboundPayload(req.body);
+    
+    // Log received message details for debugging
+    console.log('[INBOUND] Received email:', {
+      from: inbound.from,
+      to: inbound.to,
+      subject: inbound.subject,
+      hasText: inbound.text.length > 0,
+      textLength: inbound.text.length,
+      textPreview: inbound.text.substring(0, 100),
+      hasHtml: inbound.html.length > 0,
+      messageId: inbound.messageId,
+      inReplyTo: inbound.inReplyTo
+    });
 
     if (!inbound.from) {
       return res.status(400).json({ error: 'Inbound payload is missing sender information.' });
@@ -401,11 +414,13 @@ app.post('/inbound/email', async (req, res) => {
     if (repliedToMessage) {
       inbound.threadId = repliedToMessage.threadId || repliedToMessage.id || repliedToMessage.messageId;
       inbound.parentId = repliedToMessage.id;
+      console.log('[INBOUND] Linked to thread:', inbound.threadId);
     }
 
     const saved = addInboundMessage(inbound);
     return res.status(200).json({ success: true, id: saved.id });
   } catch (error) {
+    console.error('[INBOUND] Error processing email:', error);
     return res.status(500).json({ error: error && error.message ? error.message : 'Failed to process inbound email' });
   }
 });
@@ -472,6 +487,16 @@ app.post('/admin/api/messages/:id/reply', requireAdminAuth, async (req, res) => 
     const text = bodyText || bodyHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
     const references = [message.references, message.messageId].filter(Boolean).join(' ').trim();
+
+    console.log('[REPLY] Sending reply:', {
+      messageId: message.id,
+      messageDirection: message.direction,
+      originalMessageId: message.messageId,
+      toEmail,
+      subject: subject.substring(0, 60),
+      inReplyTo: message.messageId,
+      references: references || '(none)'
+    });
 
     const sent = await sendMail({
       to: toEmail,

@@ -111,10 +111,28 @@ async function sendMail(params) {
 
   const messageIdHeader = `<${crypto.randomUUID()}@${process.env.CUSTOM_DOMAIN || 'local'}>`;
   const headers = { 'Message-ID': messageIdHeader };
-  if (inReplyTo) headers['In-Reply-To'] = inReplyTo;
-  if (references) {
-    headers.References = Array.isArray(references) ? references.join(' ') : String(references);
+  
+  // Set In-Reply-To header - Resend expects the message-id without angle brackets for matching
+  if (inReplyTo) {
+    const inReplyToClean = String(inReplyTo).trim().replace(/^<|>$/g, '');
+    headers['In-Reply-To'] = `<${inReplyToClean}>`;
   }
+  if (references) {
+    const referencesList = Array.isArray(references) 
+      ? references.map(r => `<${String(r).trim().replace(/^<|>$/g, '')}>`) 
+      : [String(references).trim().replace(/^<|>$/g, '')].map(r => `<${r}>`);
+    headers.References = referencesList.join(' ');
+  }
+
+  console.log('[EMAIL] Sending mail via Resend:', {
+    to,
+    subject: subject.substring(0, 60),
+    hasInReplyTo: !!inReplyTo,
+    inReplyTo: headers['In-Reply-To'],
+    hasReferences: !!references,
+    references: headers.References || '(none)',
+    headers: Object.keys(headers)
+  });
 
   const mailOptions = {
     from,
