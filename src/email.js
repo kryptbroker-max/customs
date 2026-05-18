@@ -5,12 +5,6 @@ const { Resend } = require('resend');
 // Resend client is created lazily on first use so this module is easy to require.
 let resendClient;
 
-function extractMessageId(data) {
-  if (!data) return '';
-  if (typeof data === 'string') return data;
-  return data.id || data.messageId || data.message_id || '';
-}
-
 /**
  * Initialize and cache the Resend client using environment variables.
  * Expected env:
@@ -73,13 +67,11 @@ async function sendMailWithAttachment(recipientEmail, subject, htmlBody, pdfBuff
       throw resendError;
     }
 
-    const messageId = extractMessageId(data);
-
-    if (!messageId) {
+    if (!data || !data.id) {
       throw new Error('Resend send failed: missing response id');
     }
 
-    return { messageId, providerMessageId: messageId };
+    return { messageId: data.id, raw: data };
   } catch (error) {
     const wrapped = new Error(error && error.message ? `Resend send failed: ${error.message}` : 'Resend send failed');
     wrapped.code = error && error.code ? error.code : 'RESEND_SEND_FAILED';
@@ -137,13 +129,11 @@ async function sendMail(params) {
       throw resendError;
     }
 
-    const messageId = extractMessageId(data);
-
-    if (!messageId) {
+    if (!data || !data.id) {
       throw new Error('Resend send failed: missing response id');
     }
 
-    return { messageId, providerMessageId: messageId };
+    return { messageId: data.id, raw: data };
   } catch (error) {
     const wrapped = new Error(error && error.message ? `Resend send failed: ${error.message}` : 'Resend send failed');
     wrapped.code = error && error.code ? error.code : 'RESEND_SEND_FAILED';

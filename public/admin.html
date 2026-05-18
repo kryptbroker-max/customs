@@ -73,7 +73,7 @@
       max-height: 70vh;
       overflow: auto;
     }
-    .message-item {
+    .thread-item {
       border: 1px solid #dbe3ef;
       border-radius: 10px;
       padding: 10px;
@@ -81,9 +81,23 @@
       cursor: pointer;
       background: #f9fbff;
     }
-    .message-item.active {
+    .thread-item.active {
       border-color: #1f4a7c;
       background: #edf4ff;
+    }
+    .thread-title {
+      margin: 4px 0;
+      font-weight: 700;
+    }
+    .thread-count {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #dbeafe;
+      color: #1e3a8a;
+      font-size: 11px;
+      font-weight: 700;
     }
     .meta {
       color: #4f6077;
@@ -108,6 +122,32 @@
       padding: 12px;
       max-height: 250px;
       overflow: auto;
+    }
+    .thread-message {
+      border: 1px solid #dbe5f0;
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 8px;
+      background: #fff;
+    }
+    .thread-message.outbound {
+      background: #f8fbff;
+    }
+    .thread-message.inbound {
+      background: #fefefe;
+    }
+    .thread-message .message-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: #4f6077;
+    }
+    .thread-message .message-body {
+      white-space: pre-wrap;
+      font-size: 13px;
+      color: #152238;
     }
     .muted {
       color: #5b6f88;
@@ -192,6 +232,53 @@
 
     let messages = [];
     let selectedId = null;
+    let selectedThreadId = null;
+
+    function getThreadMessages(threadId) {
+      return messages
+        .filter(message => (message.threadId || message.id) === threadId)
+        .sort((a, b) => new Date(a.receivedAt || 0).getTime() - new Date(b.receivedAt || 0).getTime());
+    }
+
+    function getThreadMessageCount(threadId) {
+      return getThreadMessages(threadId).length;
+    }
+
+    function getLatestMessageForThread(threadId) {
+      const threadMessages = getThreadMessages(threadId);
+      return threadMessages[threadMessages.length - 1] || null;
+    }
+
+    function getReplyTargetForThread(threadId) {
+      const threadMessages = getThreadMessages(threadId);
+      const latestInbound = [...threadMessages].reverse().find(message => message.direction !== 'outbound');
+      return latestInbound || threadMessages[threadMessages.length - 1] || null;
+    }
+
+    function groupThreads() {
+      const byThread = new Map();
+      for (const message of messages) {
+        const threadId = message.threadId || message.id;
+        if (!byThread.has(threadId)) {
+          byThread.set(threadId, []);
+        }
+        byThread.get(threadId).push(message);
+      }
+
+      return [...byThread.entries()].map(([threadId, threadMessages]) => {
+        threadMessages.sort((a, b) => new Date(a.receivedAt || 0).getTime() - new Date(b.receivedAt || 0).getTime());
+        const latest = threadMessages[threadMessages.length - 1] || null;
+        const replyTarget = getReplyTargetForThread(threadId);
+
+        return {
+          threadId,
+          messages: threadMessages,
+          latest,
+          replyTarget,
+          count: threadMessages.length
+        };
+      }).sort((a, b) => new Date(b.latest?.receivedAt || 0).getTime() - new Date(a.latest?.receivedAt || 0).getTime());
+    }
 
     function setStatus(text, isError = false) {
       statusEl.textContent = text;
@@ -215,26 +302,28 @@
     function renderList() {
       messageListEl.innerHTML = '';
       if (!messages.length) {
-        messageListEl.innerHTML = '<div class="muted">No inbound messages yet.</div>';
+        messageListEl.innerHTML = '<div class="muted">No threaded messages yet.</div>';
         return;
       }
 
-      for (const msg of messages) {
+      const threads = groupThreads();
+
+      for (const thread of threads) {
         const item = document.createElement('div');
-        item.className = 'message-item' + (msg.id === selectedId ? ' active' : '');
+        item.className = 'thread-item' + (thread.threadId === selectedThreadId ? ' active' : '');
         item.innerHTML = `
-          <div class="meta">${new Date(msg.receivedAt).toLocaleString()}</div>
-          <div class="subject">${msg.subject || '(no subject)'}</div>
-          <div class="meta">${msg.from || 'Unknown sender'}</div>
-          <div class="preview">${msg.textPreview || ''}</div>
+          <div class="meta">${new Date(thread.latest?.receivedAt || Date.now()).toLocaleString()}</div>
+          <div class="thread-title">${thread.latest?.subject || '(no subject)'}<span class="thread-count">${thread.count}</span></div>
+          <div class="meta">${thread.replyTarget?.from || thread.latest?.from || 'Unknown sender'}</div>
+          <div class="preview">${thread.latest?.textPreview || ''}</div>
         `;
-        item.addEventListener('click', () => selectMessage(msg.id));
+        item.addEventListener('click', () => selectThread(thread.threadId));
         messageListEl.appendChild(item);
       }
     }
 
-    function renderDetail(message) {
-      if (!message) {
+    function renderDetail(thread) {
+      if (!thread) {
         detailEmpty.style.display = 'block';
         detailBody.style.display = 'none';
         return;
@@ -242,25 +331,27 @@
 
       detailEmpty.style.display = 'none';
       detailBody.style.display = 'block';
-      fromEl.textContent = message.from || '';
-      toEl.textContent = message.to || '';
-      subjectEl.textContent = message.subject || '';
-      receivedAtEl.textContent = new Date(message.receivedAt).toLocaleString();
-      textEl.textContent = message.text || '(no text body)';
+      const replyTarget = thread.replyTarget || thread.latest;
 
-      const defaultReplySubject = message.subject && message.subject.toLowerCase().startsWith('re:')
-        ? message.subject
-        : `Re: ${message.subject || '(no subject)'}`;
+      fromEl.textContent = replyTarget?.from || '';
+      toEl.textContent = replyTarget?.to || '';
+      subjectEl.textContent = thread.latest?.subject || '';
+      receivedAtEl.textContent = new Date(thread.latest?.receivedAt || Date.now()).toLocaleString();
+      textEl.textContent = thread.latest?.text || '(no text body)';
+
+      const defaultReplySubject = thread.latest?.subject && thread.latest.subject.toLowerCase().startsWith('re:')
+        ? thread.latest.subject
+        : `Re: ${thread.latest?.subject || '(no subject)'}`;
       replySubjectEl.value = defaultReplySubject;
       replyTextEl.value = '';
 
-      const replies = Array.isArray(message.replies) ? message.replies : [];
-      if (!replies.length) {
-        repliesEl.innerHTML = '<span class="muted">No replies yet.</span>';
+      if (!thread.messages.length) {
+        repliesEl.innerHTML = '<span class="muted">No messages yet.</span>';
       } else {
-        repliesEl.innerHTML = replies.map(r => {
-          const sentAt = r.sentAt ? new Date(r.sentAt).toLocaleString() : '';
-          return `<div style="border:1px solid #dbe5f0;border-radius:8px;padding:8px;margin-bottom:6px;background:#f8fbff;"><div><strong>${r.subject || '(no subject)'}</strong></div><div class="meta">To: ${r.to || ''} | ${sentAt}</div><div class="meta">Message ID: ${r.messageId || ''}</div></div>`;
+        repliesEl.innerHTML = thread.messages.map(r => {
+          const sentAt = r.receivedAt ? new Date(r.receivedAt).toLocaleString() : (r.sentAt ? new Date(r.sentAt).toLocaleString() : '');
+          const role = r.direction || 'inbound';
+          return `<div class="thread-message ${role}"><div class="message-head"><div><strong>${r.subject || '(no subject)'}</strong></div><div class="meta">${role.toUpperCase()}</div></div><div class="meta">From: ${r.from || ''} | To: ${r.to || ''} | ${sentAt}</div><div class="message-body">${r.text || '(no text body)'}</div><div class="meta">Message ID: ${r.messageId || ''}</div></div>`;
         }).join('');
       }
     }
@@ -270,17 +361,48 @@
       const data = await api('/admin/api/messages');
       messages = data.messages || [];
       renderList();
-      if (selectedId) {
-        await selectMessage(selectedId, false);
+      if (selectedThreadId) {
+        await selectThread(selectedThreadId, false);
       }
       setStatus(`Loaded ${messages.length} message(s).`);
     }
 
     async function selectMessage(id, updateList = true) {
+      const message = messages.find(item => item.id === id);
+      if (!message) return;
+      selectedThreadId = message.threadId || message.id;
       selectedId = id;
+      const thread = {
+        threadId: selectedThreadId,
+        messages: getThreadMessages(selectedThreadId),
+        latest: getLatestMessageForThread(selectedThreadId),
+        replyTarget: getReplyTargetForThread(selectedThreadId)
+      };
       if (updateList) renderList();
       const data = await api(`/admin/api/messages/${encodeURIComponent(id)}`);
-      renderDetail(data.message);
+      renderDetail({
+        ...thread,
+        latest: data.message ? data.message : thread.latest
+      });
+    }
+
+    async function selectThread(threadId, updateList = true) {
+      selectedThreadId = threadId;
+      const threadMessages = getThreadMessages(threadId);
+      const replyTarget = getReplyTargetForThread(threadId);
+      selectedId = replyTarget?.id || threadMessages[0]?.id || null;
+      if (updateList) renderList();
+      if (!replyTarget) {
+        renderDetail({ threadId, messages: threadMessages, latest: getLatestMessageForThread(threadId), replyTarget: null });
+        return;
+      }
+      const data = await api(`/admin/api/messages/${encodeURIComponent(replyTarget.id)}`);
+      renderDetail({
+        threadId,
+        messages: threadMessages,
+        latest: getLatestMessageForThread(threadId),
+        replyTarget: data.message || replyTarget
+      });
     }
 
     refreshBtn.addEventListener('click', async () => {
@@ -307,7 +429,7 @@
           body: JSON.stringify({ subject, text })
         });
         setStatus(`Reply sent. Message ID: ${result.messageId}`);
-        await selectMessage(selectedId, false);
+        await selectThread(selectedThreadId, false);
       } catch (error) {
         setStatus(error.message, true);
       } finally {
