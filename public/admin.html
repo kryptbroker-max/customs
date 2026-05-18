@@ -73,6 +73,48 @@
       max-height: 70vh;
       overflow: auto;
     }
+    .detail {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 16px;
+    }
+    .detail-header {
+      padding: 14px;
+      border-bottom: 2px solid #e2e8f0;
+      margin: -14px -14px 0 -14px;
+    }
+    .detail-content {
+      overflow-y: auto;
+      flex: 1;
+    }
+    .reply-destination {
+      background: #f0f6ff;
+      border-left: 4px solid #1f4a7c;
+      padding: 10px 12px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+    .reply-destination-label {
+      color: #4f6077;
+      font-weight: 600;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .reply-destination-email {
+      color: #1f4a7c;
+      font-weight: 700;
+      word-break: break-all;
+    }
+    .reply-form-sticky {
+      position: sticky;
+      bottom: 0;
+      background: #fff;
+      border-top: 2px solid #e2e8f0;
+      padding: 16px;
+      margin: 0 -14px -14px -14px;
+      box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
+    }
     .thread-item {
       border: 1px solid #dbe3ef;
       border-radius: 10px;
@@ -126,28 +168,106 @@
     .thread-message {
       border: 1px solid #dbe5f0;
       border-radius: 8px;
-      padding: 10px;
-      margin-bottom: 8px;
+      padding: 14px;
+      margin-bottom: 12px;
       background: #fff;
     }
     .thread-message.outbound {
-      background: #f8fbff;
+      background: #f0f6ff;
+      border-left: 4px solid #1f4a7c;
     }
     .thread-message.inbound {
-      background: #fefefe;
+      background: #f9fafb;
+      border-left: 4px solid #5b6f88;
     }
-    .thread-message .message-head {
+    .message-direction-badge {
+      display: inline-block;
+      font-weight: 700;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      margin-right: 8px;
+    }
+    .message-direction-badge.outbound {
+      background: #1f4a7c;
+      color: #fff;
+    }
+    .message-direction-badge.inbound {
+      background: #5b6f88;
+      color: #fff;
+    }
+    .message-header-top {
       display: flex;
       justify-content: space-between;
+      align-items: baseline;
       gap: 12px;
       margin-bottom: 8px;
+    }
+    .message-subject {
+      font-size: 14px;
+      font-weight: 700;
+      color: #152238;
+      flex: 1;
+      word-break: break-word;
+    }
+    .message-timestamp {
+      color: #4f6077;
       font-size: 12px;
+      white-space: nowrap;
+    }
+    .message-addresses {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 12px;
+    }
+    .message-address-item {
       color: #4f6077;
     }
-    .thread-message .message-body {
+    .message-address-item strong {
+      display: block;
+      color: #152238;
+      margin-bottom: 2px;
+      font-weight: 600;
+    }
+    .message-body {
       white-space: pre-wrap;
       font-size: 13px;
       color: #152238;
+      line-height: 1.5;
+      margin-bottom: 10px;
+      word-break: break-word;
+    }
+    .message-body.empty {
+      color: #9ca3af;
+      font-style: italic;
+    }
+    .message-id {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: #4f6077;
+      padding-top: 8px;
+      border-top: 1px solid #e2e8f0;
+      word-break: break-all;
+    }
+    .copy-btn {
+      background: none;
+      border: none;
+      color: #1f4a7c;
+      cursor: pointer;
+      font-size: 11px;
+      padding: 0;
+      text-decoration: underline;
+    }
+    .copy-btn:hover {
+      color: #0d2847;
     }
     .muted {
       color: #5b6f88;
@@ -189,26 +309,33 @@
       </div>
 
       <div class="panel detail">
-        <h3>Message Detail</h3>
         <div id="detailEmpty" class="muted">Select a message to view and reply.</div>
         <div id="detailBody" class="hidden">
-          <p><strong>From:</strong> <span id="from"></span></p>
-          <p><strong>To:</strong> <span id="to"></span></p>
-          <p><strong>Subject:</strong> <span id="subject"></span></p>
-          <p><strong>Received:</strong> <span id="receivedAt"></span></p>
-
-          <h4>Text</h4>
-          <pre id="text"></pre>
-
-          <h4>Reply</h4>
-          <div class="reply-box">
-            <input id="replySubject" type="text" placeholder="Reply subject" />
-            <textarea id="replyText" placeholder="Type your reply"></textarea>
-            <button id="sendReplyBtn">Send Reply</button>
+          <div class="detail-header">
+            <h3 style="margin: 0 0 8px 0; font-size: 18px;" id="subject">(no subject)</h3>
+            <p style="margin: 0 0 4px 0; color: #4f6077; font-size: 13px;" id="receivedAt"></p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; font-size: 12px;">
+              <div><strong style="color: #152238;">From:</strong> <span id="from" style="color: #4f6077;"></span></div>
+              <div><strong style="color: #152238;">To:</strong> <span id="to" style="color: #4f6077;"></span></div>
+            </div>
           </div>
 
-          <h4>Sent Replies</h4>
-          <div id="replies" class="muted">No replies yet.</div>
+          <div class="detail-content">
+            <div id="replies" class="muted">No messages in thread yet.</div>
+          </div>
+
+          <div class="reply-form-sticky">
+            <div class="reply-destination">
+              <span class="reply-destination-label">Reply will be sent to:</span>
+              <span class="reply-destination-email" id="replyDestinationEmail"></span>
+            </div>
+
+            <div class="reply-box">
+              <input id="replySubject" type="text" placeholder="Reply subject" />
+              <textarea id="replyText" placeholder="Type your reply..."></textarea>
+              <button id="sendReplyBtn">Send Reply</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -224,11 +351,11 @@
     const toEl = document.getElementById('to');
     const subjectEl = document.getElementById('subject');
     const receivedAtEl = document.getElementById('receivedAt');
-    const textEl = document.getElementById('text');
     const repliesEl = document.getElementById('replies');
     const replySubjectEl = document.getElementById('replySubject');
     const replyTextEl = document.getElementById('replyText');
     const sendReplyBtn = document.getElementById('sendReplyBtn');
+    const replyDestinationEl = document.getElementById('replyDestinationEmail');
 
     let messages = [];
     let selectedId = null;
@@ -322,6 +449,15 @@
       }
     }
 
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        setStatus('Message ID copied!');
+        setTimeout(() => setStatus(''), 2000);
+      }).catch(err => {
+        setStatus('Failed to copy', true);
+      });
+    }
+
     function renderDetail(thread) {
       if (!thread) {
         detailEmpty.style.display = 'block';
@@ -337,7 +473,10 @@
       toEl.textContent = replyTarget?.to || '';
       subjectEl.textContent = thread.latest?.subject || '';
       receivedAtEl.textContent = new Date(thread.latest?.receivedAt || Date.now()).toLocaleString();
-      textEl.textContent = thread.latest?.text || '(no text body)';
+
+      // Set reply destination email
+      const replyDestinationEmail = replyTarget?.direction === 'outbound' ? replyTarget?.to : replyTarget?.from;
+      replyDestinationEl.textContent = replyDestinationEmail || 'Unknown recipient';
 
       const defaultReplySubject = thread.latest?.subject && thread.latest.subject.toLowerCase().startsWith('re:')
         ? thread.latest.subject
@@ -346,13 +485,46 @@
       replyTextEl.value = '';
 
       if (!thread.messages.length) {
-        repliesEl.innerHTML = '<span class="muted">No messages yet.</span>';
+        repliesEl.innerHTML = '<div class="muted">No messages in thread yet.</div>';
       } else {
-        repliesEl.innerHTML = thread.messages.map(r => {
-          const sentAt = r.receivedAt ? new Date(r.receivedAt).toLocaleString() : (r.sentAt ? new Date(r.sentAt).toLocaleString() : '');
-          const role = r.direction || 'inbound';
-          return `<div class="thread-message ${role}"><div class="message-head"><div><strong>${r.subject || '(no subject)'}</strong></div><div class="meta">${role.toUpperCase()}</div></div><div class="meta">From: ${r.from || ''} | To: ${r.to || ''} | ${sentAt}</div><div class="message-body">${r.text || '(no text body)'}</div><div class="meta">Message ID: ${r.messageId || ''}</div></div>`;
+        repliesEl.innerHTML = thread.messages.map((m, idx) => {
+          const direction = m.direction || 'inbound';
+          const sentAt = m.receivedAt ? new Date(m.receivedAt).toLocaleString() : (m.sentAt ? new Date(m.sentAt).toLocaleString() : '');
+          const messageBody = m.text && m.text.trim() ? m.text : '[No message body]';
+          const messageIdDisplay = m.messageId ? m.messageId.substring(0, 50) : '';
+          
+          return `
+            <div class="thread-message ${direction}" data-message-id="${m.messageId || ''}">
+              <div class="message-header-top">
+                <div>
+                  <span class="message-direction-badge ${direction}">${direction === 'outbound' ? 'Your Reply' : 'Incoming'}</span>
+                  <span class="message-subject">${m.subject || '(no subject)'}</span>
+                </div>
+                <span class="message-timestamp">${sentAt}</span>
+              </div>
+              <div class="message-addresses">
+                <div class="message-address-item">
+                  <strong>From:</strong>
+                  ${m.from || 'Unknown'}
+                </div>
+                <div class="message-address-item">
+                  <strong>To:</strong>
+                  ${m.to || 'Unknown'}
+                </div>
+              </div>
+              <div class="message-body">${messageBody}</div>
+              ${messageIdDisplay ? `<div class="message-id"><strong>ID:</strong> <span class="msg-id-text">${messageIdDisplay}</span>... <button class="copy-btn" data-copy-index="${idx}">Copy</button></div>` : ''}
+            </div>
+          `;
         }).join('');
+        
+        // Attach copy button event listeners
+        repliesEl.querySelectorAll('.copy-btn').forEach((btn, idx) => {
+          btn.addEventListener('click', () => {
+            const msgId = thread.messages[idx]?.messageId;
+            if (msgId) copyToClipboard(msgId);
+          });
+        });
       }
     }
 
