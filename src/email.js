@@ -1,6 +1,7 @@
 // Email sending module using Resend.
 // Exports a function that sends an email with a PDF Buffer attachment.
 const { Resend } = require('resend');
+const crypto = require('crypto');
 
 // Resend client is created lazily on first use so this module is easy to require.
 let resendClient;
@@ -41,12 +42,16 @@ async function sendMailWithAttachment(recipientEmail, subject, htmlBody, pdfBuff
   const from = process.env.FROM_EMAIL || 'Border Force <customs@ukborderforce.site>';
   const textBody = htmlBody.replace(/<[^>]+>/g, '').slice(0, 1000);
 
+  const messageIdHeader = `<${crypto.randomUUID()}@${process.env.CUSTOM_DOMAIN || 'local'}>`;
+  const headers = { 'Message-ID': messageIdHeader };
+
   const mailOptions = {
     from,
     to: recipientEmail,
     subject,
     text: textBody,
     html: htmlBody,
+    headers,
     attachments: [
       {
         filename,
@@ -71,7 +76,8 @@ async function sendMailWithAttachment(recipientEmail, subject, htmlBody, pdfBuff
       throw new Error('Resend send failed: missing response id');
     }
 
-    return { messageId: data.id, raw: data };
+    // Prefer the explicit Message-ID we set for threading, fall back to provider id
+    return { messageId: messageIdHeader || data.id, raw: data };
   } catch (error) {
     const wrapped = new Error(error && error.message ? `Resend send failed: ${error.message}` : 'Resend send failed');
     wrapped.code = error && error.code ? error.code : 'RESEND_SEND_FAILED';
@@ -103,7 +109,8 @@ async function sendMail(params) {
   const resend = getResendClient();
   const from = process.env.FROM_EMAIL || 'Border Force <customs@ukborderforce.site>';
 
-  const headers = {};
+  const messageIdHeader = `<${crypto.randomUUID()}@${process.env.CUSTOM_DOMAIN || 'local'}>`;
+  const headers = { 'Message-ID': messageIdHeader };
   if (inReplyTo) headers['In-Reply-To'] = inReplyTo;
   if (references) {
     headers.References = Array.isArray(references) ? references.join(' ') : String(references);
@@ -133,7 +140,7 @@ async function sendMail(params) {
       throw new Error('Resend send failed: missing response id');
     }
 
-    return { messageId: data.id, raw: data };
+    return { messageId: messageIdHeader || data.id, raw: data };
   } catch (error) {
     const wrapped = new Error(error && error.message ? `Resend send failed: ${error.message}` : 'Resend send failed');
     wrapped.code = error && error.code ? error.code : 'RESEND_SEND_FAILED';

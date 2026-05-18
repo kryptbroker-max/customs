@@ -101,9 +101,9 @@ function parseInboundPayload(body) {
     subject: data.subject || payload.subject || '(no subject)',
     text: data.text || data.text_body || data.plain || payload.text || '',
     html: data.html || data.html_body || payload.html || '',
-    messageId: messageId ? String(messageId).trim() : '',
-    inReplyTo: inReplyTo ? String(inReplyTo).trim() : '',
-    references: references ? String(references).trim() : '',
+    messageId: messageId ? String(messageId).trim().replace(/^<|>$/g, '') : '',
+    inReplyTo: inReplyTo ? String(inReplyTo).trim().replace(/^<|>$/g, '') : '',
+    references: references ? String(references).trim().replace(/^<|>$/g, '') : '',
     receivedAt: new Date().toISOString(),
     raw: payload
   };
@@ -381,8 +381,12 @@ app.post('/send', sendLimiter, async (req, res) => {
 app.post('/inbound/email', async (req, res) => {
   try {
     if (INBOUND_WEBHOOK_SECRET) {
-      const providedSecret = req.get('x-webhook-secret') || '';
-      if (providedSecret !== INBOUND_WEBHOOK_SECRET) {
+      const providedSecret = (req.get('x-webhook-secret') || req.get('x-resend-signature') || req.get('x-resend-webhook-secret') || '').trim();
+      if (!providedSecret || providedSecret !== INBOUND_WEBHOOK_SECRET) {
+        console.warn('Inbound webhook secret mismatch; provided headers:', {
+          'x-webhook-secret': req.get('x-webhook-secret'),
+          'x-resend-signature': req.get('x-resend-signature')
+        });
         return res.status(401).json({ error: 'Invalid webhook secret' });
       }
     }

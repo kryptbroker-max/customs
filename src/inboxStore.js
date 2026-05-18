@@ -5,6 +5,15 @@ const crypto = require('crypto');
 const DATA_DIR = path.resolve(__dirname, '..', 'data');
 const STORE_FILE = path.join(DATA_DIR, 'inbox.json');
 
+function normalizeMessageId(raw) {
+  if (!raw) return '';
+  try {
+    return String(raw).trim().replace(/^<|>$/g, '').toLowerCase();
+  } catch (e) {
+    return String(raw || '').trim();
+  }
+}
+
 function ensureStore() {
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -21,8 +30,34 @@ function readStore() {
     const raw = fs.readFileSync(STORE_FILE, 'utf8');
     const parsed = JSON.parse(raw);
     if (!parsed || !Array.isArray(parsed.messages)) {
-      return { messages: [] };
+      parsed.messages = Array.isArray(parsed.messages) ? parsed.messages : [];
     }
+
+    // Migrate legacy `sentMessages` into `messages` if present
+    if (Array.isArray(parsed.sentMessages) && parsed.sentMessages.length > 0) {
+      const legacy = parsed.sentMessages.map(m => ({
+        ...m,
+        direction: m.direction || 'outbound',
+        threadId: m.threadId || m.messageId || crypto.randomUUID(),
+        normalizedMessageId: normalizeMessageId(m.messageId || ''),
+        replies: m.replies || [],
+        sentAt: m.sentAt || new Date().toISOString()
+      }));
+      parsed.messages = [...parsed.messages, ...legacy];
+      delete parsed.sentMessages;
+      // persist migration
+      try { fs.writeFileSync(STORE_FILE, JSON.stringify(parsed, null, 2), 'utf8'); } catch (e) { /* ignore */ }
+    }
+
+    // Ensure every message has normalizedMessageId for reliable lookups
+    if (Array.isArray(parsed.messages)) {
+      parsed.messages = parsed.messages.map(m => ({
+        ...m,
+        messageId: m.messageId || '',
+        normalizedMessageId: normalizeMessageId(m.normalizedMessageId || m.messageId || '')
+      }));
+    }
+
     return parsed;
   } catch (error) {
     return { messages: [] };
@@ -56,7 +91,8 @@ function getMessageById(id) {
 function findMessageByMessageId(messageId) {
   if (!messageId) return null;
   const store = readStore();
-  return store.messages.find(m => m.messageId === messageId) || null;
+  const needle = normalizeMessageId(messageId);
+  return store.messages.find(m => normalizeMessageId(m.messageId) === needle || normalizeMessageId(m.normalizedMessageId) === needle) || null;
 }
 
 function getThreadIdForMessage(message) {
@@ -68,7 +104,7 @@ function addOutboundMessage(message) {
   const store = readStore();
 
   if (message.messageId) {
-    const existing = store.messages.find(m => m.messageId === message.messageId);
+    const existing = store.messages.find(m => normalizeMessageId(m.messageId) === normalizeMessageId(message.messageId));
     if (existing) return existing;
   }
 
@@ -84,6 +120,7 @@ function addOutboundMessage(message) {
     text: message.text || '',
     html: message.html || '',
     messageId: message.messageId || '',
+    normalizedMessageId: normalizeMessageId(message.messageId || ''),
     inReplyTo: message.inReplyTo || '',
     references: message.references || '',
     sentAt: message.sentAt || now,
@@ -100,7 +137,7 @@ function addInboundMessage(message) {
   const store = readStore();
 
   if (message.messageId) {
-    const existing = store.messages.find(m => m.messageId === message.messageId);
+    const existing = store.messages.find(m => normalizeMessageId(m.messageId) === normalizeMessageId(message.messageId));
     if (existing) return existing;
   }
 
@@ -116,6 +153,7 @@ function addInboundMessage(message) {
     text: message.text || '',
     html: message.html || '',
     messageId: message.messageId || '',
+    normalizedMessageId: normalizeMessageId(message.messageId || ''),
     inReplyTo: message.inReplyTo || '',
     references: message.references || '',
     receivedAt: message.receivedAt || now,
