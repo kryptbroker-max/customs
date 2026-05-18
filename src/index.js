@@ -99,8 +99,8 @@ function parseInboundPayload(body) {
     from: data.from || data.sender || payload.from || '',
     to: data.to || payload.to || '',
     subject: data.subject || payload.subject || '(no subject)',
-    text: data.text || data.text_body || data.plain || payload.text || '',
-    html: data.html || data.html_body || payload.html || '',
+    text: data.text || data.text_body || data.plain_text || data.plain || payload.text || payload.text_body || '',
+    html: data.html || data.html_body || payload.html || payload.html_body || '',
     messageId: messageId ? String(messageId).trim().replace(/^<|>$/g, '') : '',
     inReplyTo: inReplyTo ? String(inReplyTo).trim().replace(/^<|>$/g, '') : '',
     references: references ? String(references).trim().replace(/^<|>$/g, '') : '',
@@ -451,9 +451,14 @@ app.post('/admin/api/messages/:id/reply', requireAdminAuth, async (req, res) => 
       return res.status(400).json({ error: 'Provide text or html for the reply body.' });
     }
 
-    const toEmail = normalizeEmailAddress(message.from);
+    // Determine recipient based on message direction:
+    // - If replying to outbound: send to the original recipient (message.to)
+    // - If replying to inbound: send to the original sender (message.from)
+    const toEmail = normalizeEmailAddress(
+      message.direction === 'outbound' ? message.to : message.from
+    );
     if (!toEmail) {
-      return res.status(400).json({ error: 'Unable to resolve recipient email from inbound message.' });
+      return res.status(400).json({ error: 'Unable to resolve recipient email. Message may be malformed.' });
     }
 
     const defaultSubject = message.subject.toLowerCase().startsWith('re:')
