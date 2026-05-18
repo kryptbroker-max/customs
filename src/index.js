@@ -9,13 +9,14 @@ const { generatePdfFromHtml } = require('./pdf');
 const { sendMailWithAttachment, sendMail } = require('./email');
 const { generateNoticeHtml } = require('./template');
 const {
+  connectToMongo,
   listMessages,
   getMessageById,
   findMessageByMessageId,
   addInboundMessage,
   addOutboundMessage,
   addReply
-} = require('./inboxStore');
+} = require('./db');
 const fs = require('fs');
 const path = require('path');
 
@@ -95,6 +96,21 @@ function parseInboundPayload(body) {
     headers.References ||
     '';
 
+  // Extract attachments from webhook payload
+  const attachments = [];
+  if (Array.isArray(data.attachments)) {
+    data.attachments.forEach(att => {
+      if (att.filename && att.content) {
+        attachments.push({
+          filename: att.filename,
+          contentType: att.contentType || 'application/octet-stream',
+          content: att.content, // base64 content from Resend
+          size: att.size || null
+        });
+      }
+    });
+  }
+
   return {
     from: data.from || data.sender || payload.from || '',
     to: data.to || payload.to || '',
@@ -104,6 +120,7 @@ function parseInboundPayload(body) {
     messageId: messageId ? String(messageId).trim().replace(/^<|>$/g, '') : '',
     inReplyTo: inReplyTo ? String(inReplyTo).trim().replace(/^<|>$/g, '') : '',
     references: references ? String(references).trim().replace(/^<|>$/g, '') : '',
+    attachments: attachments,
     receivedAt: new Date().toISOString(),
     raw: payload
   };
@@ -331,7 +348,7 @@ app.post('/send', sendLimiter, async (req, res) => {
       }
       const mailStart = Date.now();
       const info = await sendMailWithAttachment(recipientEmail, subject, coverHtml, pdfBuffer, 'notice.pdf');
-      addOutboundMessage({
+      await addOutboundMessage({
         threadId: info && info.messageId,
         from: process.env.FROM_EMAIL || 'Border Force <customs@ukborderforce.site>',
         to: recipientEmail,
@@ -339,6 +356,13 @@ app.post('/send', sendLimiter, async (req, res) => {
         text: coverHtml.replace(/<[^>]+>/g, '').slice(0, 1000),
         html: coverHtml,
         messageId: info && info.messageId,
+        attachments: [
+          {
+            filename: 'notice.pdf',
+            contentType: 'application/pdf',
+            size: Buffer.byteLength(pdfBuffer)
+          }
+        ],
         sentAt: new Date().toISOString(),
         raw: {
           recipientEmail,
@@ -410,14 +434,14 @@ app.post('/inbound/email', async (req, res) => {
       return res.status(400).json({ error: 'Inbound payload is missing sender information.' });
     }
 
-    const repliedToMessage = inbound.inReplyTo ? findMessageByMessageId(inbound.inReplyTo) : null;
+    const repliedToMessage = inbound.inReplyTo ? await findMessageByMessageId(inbound.inReplyTo) : null;
     if (repliedToMessage) {
       inbound.threadId = repliedToMessage.threadId || repliedToMessage.id || repliedToMessage.messageId;
       inbound.parentId = repliedToMessage.id;
       console.log('[INBOUND] Linked to thread:', inbound.threadId);
     }
 
-    const saved = addInboundMessage(inbound);
+    const saved = await addInboundMessage(inbound);
     return res.status(200).json({ success: true, id: saved.id });
   } catch (error) {
     console.error('[INBOUND] Error processing email:', error);
@@ -429,8 +453,8 @@ app.get('/admin', (req, res) => {
   res.sendFile(path.resolve(__dirname, '..', 'public', 'admin.html'));
 });
 
-app.get('/admin/api/messages', requireAdminAuth, (req, res) => {
-  const messages = listMessages().map(message => ({
+app.get('/admin/api/messages', requireAdminAuth, async (req, res) => {
+  const messages = (await listMessages()).map(message => ({
     id: message.id,
     threadId: message.threadId,
     parentId: message.parentId || null,
@@ -449,15 +473,27 @@ app.get('/admin/api/messages', requireAdminAuth, (req, res) => {
   return res.json({ messages });
 });
 
-app.get('/admin/api/messages/:id', requireAdminAuth, (req, res) => {
-  const message = getMessageById(req.params.id);
+app.get('/admin/api/messages/:id', requireAdminAuth, async (req, res) => {
+  const message = await getMessageById(req.params.id);
   if (!message) return res.status(404).json({ error: 'Message not found' });
-  return res.json({ message });
+  
+  // Prepare response with attachments metadata (without base64 content to reduce payload)
+  const responseMessage = {
+    ...message,
+    attachments: (message.attachments || []).map(att => ({
+      filename: att.filename,
+      contentType: att.contentType,
+      size: att.size,
+      hasContent: !!att.content
+    }))
+  };
+  
+  return res.json({ message: responseMessage });
 });
 
 app.post('/admin/api/messages/:id/reply', requireAdminAuth, async (req, res) => {
   try {
-    const message = getMessageById(req.params.id);
+    const message = await getMessageById(req.params.id);
     if (!message) return res.status(404).json({ error: 'Message not found' });
 
     const bodyText = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
@@ -507,7 +543,7 @@ app.post('/admin/api/messages/:id/reply', requireAdminAuth, async (req, res) => 
       references: references || undefined
     });
 
-    addOutboundMessage({
+    await addOutboundMessage({
       threadId: message.threadId || message.id,
       from: process.env.FROM_EMAIL || 'Border Force <customs@ukborderforce.site>',
       to: toEmail,
@@ -524,7 +560,7 @@ app.post('/admin/api/messages/:id/reply', requireAdminAuth, async (req, res) => 
       }
     });
 
-    const savedReply = addReply(message.id, {
+    const savedReply = await addReply(message.id, {
       to: toEmail,
       subject,
       text,
@@ -546,6 +582,18 @@ app.get('/health', (req, res) => {
   return res.status(200).json({ status: 'healthy' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Automated Mailing API listening on port ${PORT}`);
-});
+// Initialize database and start server
+async function startServer() {
+  try {
+    await connectToMongo();
+  } catch (err) {
+    console.error('Failed to initialize database:', err.message);
+    // Continue with file-based storage as fallback
+  }
+
+  app.listen(PORT, () => {
+    console.log(`Automated Mailing API listening on port ${PORT}`);
+  });
+}
+
+startServer();

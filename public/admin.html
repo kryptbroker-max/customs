@@ -282,6 +282,43 @@
       margin-bottom: 8px;
       resize: vertical;
     }
+    .message-attachments {
+      background: #f5f7fa;
+      padding: 8px 12px;
+      border-radius: 4px;
+      margin: 8px 0;
+      border-left: 2px solid #d0d8e0;
+    }
+    .attachments-list {
+      list-style: none;
+      padding: 6px 0;
+      margin: 4px 0 0 0;
+    }
+    .attachment-item {
+      padding: 4px 0;
+      font-size: 12px;
+      color: #3d5066;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .attachment-name {
+      font-weight: 500;
+      color: #1f4a7c;
+    }
+    .attachment-label {
+      font-size: 11px;
+      color: #667788;
+      font-weight: 600;
+    }
+    .attachment-type {
+      font-size: 11px;
+      color: #7a8b9a;
+    }
+    .attachment-size {
+      font-size: 11px;
+      color: #9ca7b3;
+    }
     .hidden {
       display: none;
     }
@@ -491,6 +528,22 @@
           const messageBody = m.text && m.text.trim() ? m.text : '[No message body]';
           const messageIdDisplay = m.messageId ? m.messageId.substring(0, 50) : '';
           
+          // Format attachments section
+          const attachmentsHtml = (m.attachments && m.attachments.length > 0) 
+            ? `<div class="message-attachments">
+                 <strong>Attachments (${m.attachments.length}):</strong>
+                 <ul class="attachments-list">
+                   ${m.attachments.map(att => `
+                     <li class="attachment-item">
+                       <span class="attachment-label">Attachment:</span> <span class="attachment-name">${att.filename}</span>
+                       <span class="attachment-type">${att.contentType}</span>
+                       ${att.size ? `<span class="attachment-size">${(att.size / 1024).toFixed(1)} KB</span>` : ''}
+                     </li>
+                   `).join('')}
+                 </ul>
+               </div>`
+            : '';
+          
           return `
             <div class="thread-message ${direction}" data-message-id="${m.messageId || ''}">
               <div class="message-header-top">
@@ -511,6 +564,7 @@
                 </div>
               </div>
               <div class="message-body">${messageBody}</div>
+              ${attachmentsHtml}
               ${messageIdDisplay ? `<div class="message-id"><strong>ID:</strong> <span class="msg-id-text">${messageIdDisplay}</span>... <button class="copy-btn" data-copy-index="${idx}">Copy</button></div>` : ''}
             </div>
           `;

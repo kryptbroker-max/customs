@@ -123,6 +123,7 @@ function addOutboundMessage(message) {
     normalizedMessageId: normalizeMessageId(message.messageId || ''),
     inReplyTo: message.inReplyTo || '',
     references: message.references || '',
+    attachments: message.attachments || [],
     sentAt: message.sentAt || now,
     raw: message.raw || null,
     replies: []
@@ -156,6 +157,7 @@ function addInboundMessage(message) {
     normalizedMessageId: normalizeMessageId(message.messageId || ''),
     inReplyTo: message.inReplyTo || '',
     references: message.references || '',
+    attachments: message.attachments || [],
     receivedAt: message.receivedAt || now,
     raw: message.raw || null,
     replies: []

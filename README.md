@@ -40,6 +40,7 @@ Create a `.env` from `.env.example` and fill in email API credentials. Required 
 
 Optional env vars:
 - `INBOUND_WEBHOOK_SECRET` (recommended to protect inbound webhook calls)
+- `MONGODB_URI` (recommended in production to persist inbox data across restarts)
 
 Example `.env` values:
 
@@ -49,6 +50,7 @@ RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 FROM_EMAIL="Border Force <customs@ukborderforce.site>"
 ADMIN_TOKEN=change-this-long-random-token
 INBOUND_WEBHOOK_SECRET=optional-webhook-secret
+MONGODB_URI=mongodb+srv://user:password@cluster.mongodb.net/?retryWrites=true&w=majority
 CUSTOM_DOMAIN=ukborderforce.site
 ORGANIZATION_NAME=Border Force
 ```
@@ -91,7 +93,15 @@ Example payload:
   "to": "customs@ukborderforce.site",
   "subject": "Question about notice",
   "text": "Hello, can you confirm this case?",
-  "message_id": "<abc123@example.com>"
+  "message_id": "<abc123@example.com>",
+  "attachments": [
+    {
+      "filename": "photo.jpg",
+      "contentType": "image/jpeg",
+      "content": "base64-data",
+      "size": 10240
+    }
+  ]
 }
 ```
 
@@ -117,7 +127,8 @@ Notes and security
 - Keep API credentials out of source control.
 - Set a strong `ADMIN_TOKEN` in production.
 - Protect `/inbound/email` with `INBOUND_WEBHOOK_SECRET`.
-- Inbox data is stored in `data/inbox.json` and should not be committed.
+- Inbox data is stored in `data/inbox.json` when `MONGODB_URI` is not set.
+- In production (Render), set `MONGODB_URI` to avoid message loss on restarts/redeploys.
 - For production, run behind TLS (HTTPS) and lock down origins.
 - Puppeteer can be resource-heavy; consider a headless Chrome service or rendering queue for high throughput.
 - On Render's free plan, the web service can spin down after inactivity. Use an external uptime monitor to ping `GET /health` every few minutes if you want to reduce cold starts.
