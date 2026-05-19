@@ -73,11 +73,20 @@ function findMessageByTelegramMessageId(chatId, telegramMessageId) {
   if (!telegramMessageId) return null;
   const store = readStore();
   const needle = String(telegramMessageId);
-  return store.messages.find(m => {
+
+  const exactMatch = store.messages.find(m => {
     if (!m.telegram) return false;
     const mid = m.telegram.messageId ? String(m.telegram.messageId) : '';
     const cid = m.telegram.chatId ? String(m.telegram.chatId) : '';
     return mid === needle && (String(chatId || '') === '' || cid === String(chatId));
+  });
+
+  if (exactMatch) return exactMatch;
+
+  return store.messages.find(m => {
+    if (!m.telegram) return false;
+    const mid = m.telegram.messageId ? String(m.telegram.messageId) : '';
+    return mid === needle;
   }) || null;
 }
 

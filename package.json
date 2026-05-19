@@ -4,7 +4,8 @@
   "description": "Express API that converts HTML to A4 PDF and emails it as attachment",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "test": "node scripts/test-local.js"
   },
   "keywords": [],
   "author": "",

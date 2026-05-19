@@ -143,9 +143,8 @@ async function sendMail(params) {
     headers: Object.keys(headers).length > 0 ? headers : undefined
   };
 
-  try {
-    const { data, error } = await resend.emails.send(mailOptions);
-
+  async function sendWithResend(options) {
+    const { data, error } = await resend.emails.send(options);
     if (error) {
       const resendError = new Error(error.message || 'Resend send failed');
       resendError.code = error.name || 'RESEND_SEND_FAILED';
@@ -153,12 +152,29 @@ async function sendMail(params) {
       resendError.response = error;
       throw resendError;
     }
-
     if (!data || !data.id) {
       throw new Error('Resend send failed: missing response id');
     }
-
     return { messageId: messageIdHeader || data.id, raw: data };
+  }
+
+  try {
+    try {
+      return await sendWithResend(mailOptions);
+    } catch (error) {
+      const canRetry = error && error.code === 'application_error' && error.response && (headers['In-Reply-To'] || headers.References);
+      if (canRetry) {
+        console.warn('[EMAIL] Resend replied with application_error for reply headers; retrying without In-Reply-To/References.');
+        const fallbackOptions = { ...mailOptions, headers: { ...mailOptions.headers } };
+        delete fallbackOptions.headers['In-Reply-To'];
+        delete fallbackOptions.headers.References;
+        if (Object.keys(fallbackOptions.headers).length === 0) {
+          delete fallbackOptions.headers;
+        }
+        return await sendWithResend(fallbackOptions);
+      }
+      throw error;
+    }
   } catch (error) {
     const wrapped = new Error(error && error.message ? `Resend send failed: ${error.message}` : 'Resend send failed');
     wrapped.code = error && error.code ? error.code : 'RESEND_SEND_FAILED';

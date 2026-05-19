@@ -1,34 +1,52 @@
-const https = require('https');
-const id = process.argv[2];
-const key = process.env.RESEND_API_KEY || process.env.RESEND_KEY || '';
-if (!id) {
-  console.error('Usage: node fetch-resend-email.js <email_id>');
-  process.exit(2);
+#!/usr/bin/env node
+
+require('dotenv').config();
+const fetch = global.fetch || require('node-fetch');
+
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const emailId = process.argv[2];
+
+if (!RESEND_API_KEY) {
+  console.error('ERROR: RESEND_API_KEY is not configured in .env');
+  process.exit(1);
 }
-if (!key) {
-  console.error('No RESEND_API_KEY in environment');
-  process.exit(2);
+
+if (!emailId) {
+  console.error('Usage: node scripts/fetch-resend-email.js <email_id>');
+  console.error('Example: node scripts/fetch-resend-email.js email_12345');
+  process.exit(1);
 }
-const opts = { headers: { Authorization: 'Bearer ' + key } };
-https.get('https://api.resend.com/emails/' + id, opts, res => {
-  let b = '';
-  res.on('data', c => b += c);
-  res.on('end', () => {
-    try {
-      const j = JSON.parse(b);
-      console.log('FETCHED KEYS:', Object.keys(j));
-      const text = j.text || j.html;
-      if (text && typeof text === 'string') {
-        const plain = /<[^>]+>/.test(text) ? text.replace(/<[^>]+>/g, '') : text;
-        console.log('\nTEXT PREVIEW:\n', plain.slice(0, 2000));
-      } else {
-        console.log('\nTEXT PREVIEW:\n No body found');
+
+const endpoint = `https://api.resend.com/emails/${encodeURIComponent(emailId)}`;
+
+async function main() {
+  try {
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json'
       }
-    } catch (e) {
-      console.error('PARSE ERROR', e);
-      console.log('RAW:', b.slice(0, 2000));
+    });
+
+    const payload = await response.text();
+    if (!response.ok) {
+      console.error('Failed to fetch Resend email:', response.status, response.statusText);
+      console.error(payload);
+      process.exit(1);
     }
-  });
-}).on('error', e => {
-  console.error('REQ ERROR', e);
-});
+
+    try {
+      const parsed = JSON.parse(payload);
+      console.log(JSON.stringify(parsed, null, 2));
+    } catch (parseErr) {
+      console.log(payload);
+    }
+  } catch (err) {
+    console.error('Request failed:', err && err.message ? err.message : err);
+    process.exit(1);
+  }
+}
+
+main();
+module.exports = { generatePdfFromHtml };

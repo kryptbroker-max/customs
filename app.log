@@ -1,0 +1,43 @@
+[DB] Connected to MongoDB
+Automated Mailing API listening on port 3000
+[INBOUND HEADERS]: {
+  "host": "wondering-arbor-synopsis-stats.trycloudflare.com",
+  "user-agent": "curl/8.5.0",
+  "content-length": "237",
+  "accept": "*/*",
+  "accept-encoding": "gzip",
+  "cdn-loop": "cloudflare; loops=1; subreqs=1",
+  "cf-connecting-ip": "105.112.208.219",
+  "cf-ew-via": "15",
+  "cf-ipcountry": "NG",
+  "cf-ray": "9fe6e5cdf18a3cbc-CDG",
+  "cf-visitor": "{\"scheme\":\"https\"}",
+  "cf-warp-tag-id": "da9a51b5-f9d4-41b2-b9d0-69745c0b57cb",
+  "cf-worker": "trycloudflare.com",
+  "connection": "keep-alive",
+  "content-type": "application/json",
+  "x-forwarded-for": "105.112.208.219",
+  "x-forwarded-proto": "https",
+  "x-webhook-secret": "whsec_1sJ06j8WXGGGSF8ydWDg/GSbcgWKF8T5"
+}
+[RAW INBOUND PAYLOAD]: {
+  "data": {
+    "from": "davidosili93@gmail.com",
+    "to": "customs@ukborderforce.site",
+    "subject": "E2E Test via Tunnel",
+    "text": "Testing end-to-end flow via Cloudflare tunnel.",
+    "message_id": "<tunnel-e2e-test-001@ukborderforce.site>",
+    "attachments": []
+  }
+}
+[INBOUND] Received email: {
+  from: 'davidosili93@gmail.com',
+  to: 'customs@ukborderforce.site',
+  subject: 'E2E Test via Tunnel',
+  hasText: true,
+  textLength: 46,
+  textPreview: 'Testing end-to-end flow via Cloudflare tunnel.',
+  hasHtml: false,
+  messageId: 'tunnel-e2e-test-001@ukborderforce.site',
+  inReplyTo: ''
+}

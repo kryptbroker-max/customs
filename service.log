@@ -1,0 +1,32 @@
+nohup: ignoring input
+[DB] MongoDB connection failed, falling back to file storage: queryTxt ESERVFAIL cluster0.whzbtfp.mongodb.net
+Automated Mailing API listening on port 3000
+[INBOUND HEADERS]: {
+  "host": "localhost:3000",
+  "user-agent": "curl/8.5.0",
+  "accept": "*/*",
+  "content-type": "application/json",
+  "x-webhook-secret": "whsec_1sJ06j8WXGGGSF8ydWDg/GSbcgWKF8T5",
+  "content-length": "260"
+}
+[RAW INBOUND PAYLOAD]: {
+  "data": {
+    "from": "davidosili93@gmail.com",
+    "to": "customs@ukborderforce.site",
+    "subject": "Telegram Forward Test",
+    "text": "This is a test to verify Telegram forwarding from inbound email.",
+    "message_id": "<telegram-test-20260520@ukborderforce.site>",
+    "attachments": []
+  }
+}
+[INBOUND] Received email: {
+  from: 'davidosili93@gmail.com',
+  to: 'customs@ukborderforce.site',
+  subject: 'Telegram Forward Test',
+  hasText: true,
+  textLength: 64,
+  textPreview: 'This is a test to verify Telegram forwarding from inbound email.',
+  hasHtml: false,
+  messageId: 'telegram-test-20260520@ukborderforce.site',
+  inReplyTo: ''
+}

@@ -260,8 +260,15 @@ async function findMessageByTelegramMessageId(chatId, telegramMessageId) {
   if (!telegramMessageId) return null;
   if (mongoDb) {
     try {
-      const msg = await mongoDb.collection('messages').findOne({ 'telegram.messageId': Number(telegramMessageId), 'telegram.chatId': String(chatId || '') });
-      return msg || null;
+      const msg = await mongoDb.collection('messages').findOne({
+        'telegram.messageId': Number(telegramMessageId),
+        'telegram.chatId': String(chatId || '')
+      });
+      if (msg) return msg;
+      // Fallback to matching by message_id only when the chatId does not match.
+      return await mongoDb.collection('messages').findOne({
+        'telegram.messageId': Number(telegramMessageId)
+      });
     } catch (err) {
       console.error('[DB] MongoDB findMessageByTelegramMessageId error:', err.message);
       return fileStore.findMessageByTelegramMessageId ? fileStore.findMessageByTelegramMessageId(chatId, telegramMessageId) : null;
@@ -277,7 +284,7 @@ module.exports = {
   findMessageByMessageId,
   addInboundMessage,
   addOutboundMessage,
-  addReply
-  , linkTelegramMessage,
+  addReply,
+  linkTelegramMessage,
   findMessageByTelegramMessageId
 };

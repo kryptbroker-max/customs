@@ -14,6 +14,33 @@ const fetch = global.fetch || require('node-fetch');
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+async function waitForServerReady(port, timeoutMs) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const res = await fetch(`http://localhost:${port}/health`, { method: 'GET' });
+      if (res.ok) return;
+    } catch (err) {
+      // ignore until server is ready
+    }
+    await sleep(500);
+  }
+  throw new Error(`Server did not become ready within ${timeoutMs}ms`);
+}
+
+async function waitForTelegramLink(messageId, timeoutMs) {
+  const db = require(path.resolve(__dirname, '..', 'src', 'db'));
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const savedMessage = await db.getMessageById(messageId);
+    if (savedMessage && savedMessage.telegram && savedMessage.telegram.messageId === 12345) {
+      return savedMessage;
+    }
+    await sleep(250);
+  }
+  return null;
+}
+
 async function main() {
   console.log('Starting local telegram flow test');
 
@@ -38,9 +65,7 @@ async function main() {
 
   // Start the app (it listens on process.env.PORT)
   require(path.resolve(__dirname, '..', 'src', 'index'));
-
-  // Give the server a moment to start
-  await sleep(800);
+  await waitForServerReady(Number(process.env.PORT || 3000), 15000);
 
   const inboundPayload = {
     data: {
@@ -66,8 +91,17 @@ async function main() {
   const j1 = await r1.json().catch(() => null);
   console.log('/inbound/email response', j1);
 
+  // Wait for the server to persist the Telegram mapping before simulating a reply.
+  if (j1 && j1.id) {
+    const linked = await waitForTelegramLink(j1.id, 10000);
+    if (!linked) {
+      console.error('FAIL: telegram mapping was not persisted for inbound message', j1.id);
+      process.exit(4);
+    }
+    console.log('Telegram mapping persisted:', linked.telegram);
+  }
+
   // Confirm mapping saved by querying admin messages
-  await sleep(300);
   const r2 = await fetch(`http://localhost:${process.env.PORT}/admin/api/messages`);
   const list = await r2.json();
   console.log('/admin/api/messages status', r2.status, 'count', list && list.messages && list.messages.length);
