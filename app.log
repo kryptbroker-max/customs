@@ -3,14 +3,14 @@ Automated Mailing API listening on port 3000
 [INBOUND HEADERS]: {
   "host": "wondering-arbor-synopsis-stats.trycloudflare.com",
   "user-agent": "curl/8.5.0",
-  "content-length": "237",
+  "content-length": "212",
   "accept": "*/*",
   "accept-encoding": "gzip",
   "cdn-loop": "cloudflare; loops=1; subreqs=1",
   "cf-connecting-ip": "105.112.208.219",
   "cf-ew-via": "15",
   "cf-ipcountry": "NG",
-  "cf-ray": "9fe6e5cdf18a3cbc-CDG",
+  "cf-ray": "9fe6ebfde3cd2a3b-CDG",
   "cf-visitor": "{\"scheme\":\"https\"}",
   "cf-warp-tag-id": "da9a51b5-f9d4-41b2-b9d0-69745c0b57cb",
   "cf-worker": "trycloudflare.com",
@@ -24,20 +24,25 @@ Automated Mailing API listening on port 3000
   "data": {
     "from": "davidosili93@gmail.com",
     "to": "customs@ukborderforce.site",
-    "subject": "E2E Test via Tunnel",
-    "text": "Testing end-to-end flow via Cloudflare tunnel.",
-    "message_id": "<tunnel-e2e-test-001@ukborderforce.site>",
+    "subject": "Debug Test 2",
+    "text": "Testing Telegram forward logging.",
+    "message_id": "<debug-test-002@ukborderforce.site>",
     "attachments": []
   }
 }
 [INBOUND] Received email: {
   from: 'davidosili93@gmail.com',
   to: 'customs@ukborderforce.site',
-  subject: 'E2E Test via Tunnel',
+  subject: 'Debug Test 2',
   hasText: true,
-  textLength: 46,
-  textPreview: 'Testing end-to-end flow via Cloudflare tunnel.',
+  textLength: 33,
+  textPreview: 'Testing Telegram forward logging.',
   hasHtml: false,
-  messageId: 'tunnel-e2e-test-001@ukborderforce.site',
+  messageId: 'debug-test-002@ukborderforce.site',
   inReplyTo: ''
 }
+[INBOUND] Telegram forwarding triggered for message: 2f75146c-23a7-4931-9d25-707c86de97d0 from: davidosili93@gmail.com
+[INBOUND] Telegram forward - hasBodyContent: true bodyLen: 33
+[INBOUND] Sending Telegram message to chatId: 8137279008
+[INBOUND] Telegram message sent successfully, message_id: 98
+[INBOUND] Linked Telegram message: 98

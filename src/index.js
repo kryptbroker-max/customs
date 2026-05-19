@@ -554,19 +554,24 @@ app.post('/inbound/email', webhookLimiter, async (req, res) => {
 
     // Forward inbound to Telegram if configured; do not block the webhook response.
     if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
+      console.log('[INBOUND] Telegram forwarding triggered for message:', saved.id, 'from:', saved.from);
       Promise.resolve().then(async () => {
         try {
           const body = saved.text || (saved.html ? saved.html.replace(/<[^>]+>/g, '') : '') || '(no body)';
           const hasBodyContent = body && body !== '(no body)';
+          console.log('[INBOUND] Telegram forward - hasBodyContent:', hasBodyContent, 'bodyLen:', body.length);
           const messageText = hasBodyContent
             ? `*From:* ${escapeMarkdownV2(saved.from || '')}\n*Subject:* ${escapeMarkdownV2(saved.subject || '')}\n\n${escapeMarkdownV2(body).substring(0, 4000)}`
             : `📬 New Inbound Metadata Received!\nFrom: ${saved.from || ''}\nSubject: ${saved.subject || ''}\n[Body content omitted by webhook provider]`;
 
+          console.log('[INBOUND] Sending Telegram message to chatId:', TELEGRAM_CHAT_ID);
           const result = hasBodyContent
             ? await sendTelegramMessage(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, messageText, { parse_mode: 'MarkdownV2' })
             : await sendTelegramMessage(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, messageText, { parse_mode: '' });
+          console.log('[INBOUND] Telegram message sent successfully, message_id:', result && result.message_id);
           if (result && result.message_id) {
             await linkTelegramMessage(saved.id, result.chat && result.chat.id ? result.chat.id : TELEGRAM_CHAT_ID, result.message_id);
+            console.log('[INBOUND] Linked Telegram message:', result.message_id);
           }
         } catch (tgErr) {
           console.error('[INBOUND] Telegram forward failed:', tgErr && tgErr.message ? tgErr.message : tgErr);
