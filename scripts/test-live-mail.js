@@ -1,5 +1,10 @@
 #!/usr/bin/env node
 
+require('dotenv').config();
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first');
+global.fetch = require('node-fetch');
+
 /**
  * End-to-End Test Script for Automated Mailing API
  * 
@@ -47,6 +52,7 @@ async function runTest() {
   console.log(`🚗 Vehicle: ${testPayload.vehicle_description}`);
   console.log(`📋 VIN: ${testPayload.vehicle_vin}`);
   console.log(`📅 Date: ${testPayload.date_of_notice}`);
+  console.log(`🔑 RESEND_API_KEY prefix: ${String(process.env.RESEND_API_KEY || '').slice(0, 5)}`);
   console.log('\n⏳ Sending request...\n');
 
   try {

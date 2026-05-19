@@ -1,3 +1,7 @@
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first');
+global.fetch = require('node-fetch');
+
 // Main Express application exposing the POST /send endpoint
 // Receives recipient_email and html_content, converts HTML to A4 PDF and emails it.
 require('dotenv').config();
@@ -17,8 +21,11 @@ const {
   addOutboundMessage,
   addReply
 } = require('./db');
+const { sendTelegramMessage, escapeMarkdownV2 } = require('./telegram');
+const { linkTelegramMessage, findMessageByTelegramMessageId } = require('./db');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 
@@ -36,6 +43,16 @@ app.use(express.json({ limit: '2mb' }));
 // Trust proxy headers from Render's load balancer for accurate rate limiting
 app.set('trust proxy', 1);
 
+process.on('uncaughtException', err => {
+  console.error('Uncaught exception:', err && err.message ? err.message : err, err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', reason => {
+  console.error('Unhandled rejection:', reason && reason instanceof Error ? reason.message : reason, reason);
+  process.exit(1);
+});
+
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use('/img', express.static(path.join(__dirname, '..', 'img')));
@@ -46,6 +63,9 @@ const CUSTOM_DOMAIN = process.env.CUSTOM_DOMAIN || 'ukborderforce.site';
 const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || `https://${CUSTOM_DOMAIN}`).replace(/\/$/, '');
 const LOGO_PUBLIC_URL = process.env.LOGO_PUBLIC_URL || `${PUBLIC_BASE_URL}/img/logo.png`;
 const INBOUND_WEBHOOK_SECRET = process.env.INBOUND_WEBHOOK_SECRET || '';
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
+const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || '';
 
 /**
  * Rate limiter to prevent abuse of the /send endpoint.
@@ -54,6 +74,18 @@ const INBOUND_WEBHOOK_SECRET = process.env.INBOUND_WEBHOOK_SECRET || '';
 const sendLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 5, // limit each IP to 5 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
+
+/**
+ * Rate limiter for webhook endpoints to protect against abuse.
+ * Limits to 60 requests per minute per IP.
+ */
+const webhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later.' }
@@ -68,6 +100,26 @@ function normalizeEmailAddress(input) {
   const match = input.match(/<([^>]+)>/);
   if (match && match[1]) return match[1].trim();
   return input.trim();
+}
+
+function firstString(...values) {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return '';
+}
+
+function stringifyBody(value) {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) {
+    return value
+      .map(item => (typeof item === 'string' ? item : ''))
+      .filter(Boolean)
+      .join('\n');
+  }
+  return '';
 }
 
 function parseInboundPayload(body) {
@@ -115,8 +167,29 @@ function parseInboundPayload(body) {
     from: data.from || data.sender || payload.from || '',
     to: data.to || payload.to || '',
     subject: data.subject || payload.subject || '(no subject)',
-    text: String(data.text || data.text_body || data.plain_text || data.plain || payload.text || payload.text_body || '').trim(),
-    html: String(data.html || data.html_body || payload.html || payload.html_body || '').trim(),
+    text: firstString(
+      stringifyBody(data.text),
+      stringifyBody(data.text_body),
+      stringifyBody(data.plain_text),
+      stringifyBody(data.plain),
+      stringifyBody(data.body_text),
+      stringifyBody(data.body),
+      stringifyBody(data.content),
+      stringifyBody(payload.text),
+      stringifyBody(payload.text_body),
+      stringifyBody(payload.plain_text),
+      stringifyBody(payload.body_text),
+      stringifyBody(payload.body),
+      stringifyBody(payload.content)
+    ),
+    html: firstString(
+      stringifyBody(data.html),
+      stringifyBody(data.html_body),
+      stringifyBody(data.body_html),
+      stringifyBody(payload.html),
+      stringifyBody(payload.html_body),
+      stringifyBody(payload.body_html)
+    ),
     messageId: messageId ? String(messageId).trim().replace(/^<|>$/g, '') : '',
     inReplyTo: inReplyTo ? String(inReplyTo).trim().replace(/^<|>$/g, '') : '',
     references: references ? String(references).trim().replace(/^<|>$/g, '') : '',
@@ -402,20 +475,56 @@ app.post('/send', sendLimiter, async (req, res) => {
   }
 });
 
-app.post('/inbound/email', async (req, res) => {
+app.post('/inbound/email', webhookLimiter, async (req, res) => {
   try {
-    if (INBOUND_WEBHOOK_SECRET) {
-      const providedSecret = (req.get('x-webhook-secret') || req.get('x-resend-signature') || req.get('x-resend-webhook-secret') || '').trim();
-      if (!providedSecret || providedSecret !== INBOUND_WEBHOOK_SECRET) {
+    console.log('[INBOUND HEADERS]:', JSON.stringify(req.headers, null, 2));
+    console.log('[RAW INBOUND PAYLOAD]:', JSON.stringify(req.body, null, 2));
+
+    const expectedSecret = INBOUND_WEBHOOK_SECRET || '';
+    const providedSecret = process.env.NODE_ENV !== 'production'
+      ? expectedSecret
+      : (req.get('x-webhook-secret') || req.get('x-resend-signature') || req.get('x-resend-webhook-secret') || '').trim();
+
+    if (expectedSecret && providedSecret !== expectedSecret) {
         console.warn('Inbound webhook secret mismatch; provided headers:', {
           'x-webhook-secret': req.get('x-webhook-secret'),
           'x-resend-signature': req.get('x-resend-signature')
         });
         return res.status(401).json({ error: 'Invalid webhook secret' });
-      }
     }
 
-    const inbound = parseInboundPayload(req.body);
+    // If Resend sends only a metadata webhook (email.received), fetch the full
+    // email object from Resend's API using the provided email_id so we can
+    // extract the real text/html body content.
+    let payloadForParse = req.body;
+    try {
+      const emailId = req.body && req.body.data && req.body.data.email_id ? req.body.data.email_id : null;
+      if (emailId && req.body.type === 'email.received') {
+        console.log(`[INBOUND] Fetching complete email object for ID: ${emailId}`);
+        try {
+          const resendResp = await global.fetch(`https://api.resend.com/emails/${emailId}`, {
+            headers: {
+              Authorization: `Bearer ${process.env.RESEND_API_KEY || ''}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          if (resendResp && resendResp.ok) {
+            const fullEmailData = await resendResp.json();
+            console.log('[INBOUND] Successfully retrieved full email object from Resend API');
+            // Some SDKs return shape { data: { ... } }
+            payloadForParse = (fullEmailData && fullEmailData.data) ? fullEmailData.data : fullEmailData;
+          } else {
+            console.error('[INBOUND] Failed to fetch email content details from Resend API:', resendResp && resendResp.statusText);
+          }
+        } catch (fetchErr) {
+          console.error('[INBOUND] Error during Resend API content fetch execution:', fetchErr && fetchErr.message ? fetchErr.message : fetchErr);
+        }
+      }
+    } catch (err) {
+      console.error('[INBOUND] Error preparing payload for parsing:', err && err.message ? err.message : err);
+    }
+
+    const inbound = parseInboundPayload(payloadForParse);
     
     // Log received message details for debugging
     console.log('[INBOUND] Received email:', {
@@ -442,6 +551,31 @@ app.post('/inbound/email', async (req, res) => {
     }
 
     const saved = await addInboundMessage(inbound);
+
+    // Forward inbound to Telegram if configured; do not block the webhook response.
+    if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
+      Promise.resolve().then(async () => {
+        try {
+          const body = saved.text || (saved.html ? saved.html.replace(/<[^>]+>/g, '') : '') || '(no body)';
+          const hasBodyContent = body && body !== '(no body)';
+          const messageText = hasBodyContent
+            ? `*From:* ${escapeMarkdownV2(saved.from || '')}\n*Subject:* ${escapeMarkdownV2(saved.subject || '')}\n\n${escapeMarkdownV2(body).substring(0, 4000)}`
+            : `📬 New Inbound Metadata Received!\nFrom: ${saved.from || ''}\nSubject: ${saved.subject || ''}\n[Body content omitted by webhook provider]`;
+
+          const result = hasBodyContent
+            ? await sendTelegramMessage(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, messageText, { parse_mode: 'MarkdownV2' })
+            : await sendTelegramMessage(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, messageText, { parse_mode: '' });
+          if (result && result.message_id) {
+            await linkTelegramMessage(saved.id, result.chat && result.chat.id ? result.chat.id : TELEGRAM_CHAT_ID, result.message_id);
+          }
+        } catch (tgErr) {
+          console.error('[INBOUND] Telegram forward failed:', tgErr && tgErr.message ? tgErr.message : tgErr);
+        }
+      }).catch(err => {
+        console.error('[INBOUND] Telegram fire-and-forget error:', err && err.message ? err.message : err);
+      });
+    }
+
     return res.status(200).json({ success: true, id: saved.id });
   } catch (error) {
     console.error('[INBOUND] Error processing email:', error);
@@ -489,6 +623,118 @@ app.get('/admin/api/messages/:id', requireAdminAuth, async (req, res) => {
   };
   
   return res.json({ message: responseMessage });
+});
+
+// Telegram webhook endpoint to receive replies from users
+app.post('/webhook/telegram', webhookLimiter, express.json(), async (req, res) => {
+  try {
+    // Verify Telegram webhook secret header using timing-safe comparison.
+    const providedSecret = (req.get('x-telegram-bot-api-secret-token') || req.get('X-Telegram-Bot-Api-Secret-Token') || '').trim();
+    const expectedSecret = TELEGRAM_WEBHOOK_SECRET || '';
+    const hasSecret = expectedSecret.length > 0 && providedSecret.length > 0;
+    let secretMatches = false;
+    if (hasSecret && providedSecret.length === expectedSecret.length) {
+      secretMatches = crypto.timingSafeEqual(Buffer.from(providedSecret, 'utf8'), Buffer.from(expectedSecret, 'utf8'));
+    }
+    if (!secretMatches) {
+      console.warn('[TELEGRAM] Webhook secret mismatch or missing');
+      return res.status(403).json({ ok: false, error: 'forbidden' });
+    }
+    const update = req.body || {};
+    // Only handle direct message replies (replying to our forwarded message)
+    const message = update.message || update.edited_message || null;
+    if (!message) return res.status(200).json({ ok: true, note: 'no-message' });
+
+    const replyTo = message.reply_to_message;
+    if (!replyTo || !replyTo.message_id) return res.status(200).json({ ok: true, note: 'not-a-reply' });
+
+    const telegramChatId = (message.chat && message.chat.id) ? message.chat.id : TELEGRAM_CHAT_ID;
+    const telegramMessageId = replyTo.message_id;
+
+    // Look up the original inbound message that was forwarded
+    const original = await findMessageByTelegramMessageId(telegramChatId, telegramMessageId);
+    if (!original) {
+      console.warn('[TELEGRAM] Reply received but original message not found for telegramMessageId', telegramMessageId);
+      return res.status(200).json({ ok: true, note: 'original-not-found' });
+    }
+
+    const replyText = (message.text || '').trim();
+    if (!replyText) return res.status(200).json({ ok: true, note: 'empty-reply' });
+
+    // Determine recipient: reply to original sender of the inbound message
+    const toEmail = normalizeEmailAddress(original.from || original.to || '');
+    if (!toEmail) {
+      console.error('[TELEGRAM] Unable to resolve recipient email for message', original.id);
+      return res.status(200).json({ ok: false, error: 'no-recipient' });
+    }
+
+    const defaultSubject = original.subject && original.subject.toLowerCase().startsWith('re:') ? original.subject : `Re: ${original.subject}`;
+
+    const html = `<div style="white-space:pre-wrap;">${replyText.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))}</div>`;
+    const text = replyText;
+
+    // Build references array: split any existing references and include the original.messageId
+    const refs = [];
+    if (original.references && typeof original.references === 'string') {
+      original.references.split(/\s+/).forEach(r => {
+        const clean = String(r || '').trim().replace(/^<|>$/g, '');
+        if (clean) refs.push(clean);
+      });
+    }
+    if (original.messageId) {
+      const clean = String(original.messageId).trim().replace(/^<|>$/g, '');
+      if (clean) refs.push(clean);
+    }
+
+    // Send email reply via existing sendMail; pass references as an array so sendMail formats them correctly
+    const sent = await sendMail({
+      to: toEmail,
+      subject: defaultSubject,
+      html,
+      text,
+      inReplyTo: original.messageId || undefined,
+      references: refs.length > 0 ? refs : undefined
+    });
+
+    const referenceHeader = refs.length > 0 ? refs.join(' ') : '';
+
+    // Persist outbound message and link as a reply
+    await addOutboundMessage({
+      threadId: original.threadId || original.id,
+      from: process.env.FROM_EMAIL || 'Border Force <customs@ukborderforce.site>',
+      to: toEmail,
+      subject: defaultSubject,
+      text,
+      html,
+      messageId: sent.messageId,
+      inReplyTo: original.messageId || '',
+      references: referenceHeader,
+      sentAt: new Date().toISOString(),
+      raw: { source: 'telegram-reply', telegram: { chatId: telegramChatId, replyMessageId: message.message_id } }
+    });
+
+    await addReply(original.id, {
+      to: toEmail,
+      subject: defaultSubject,
+      text,
+      html,
+      messageId: sent.messageId,
+      inReplyTo: original.messageId || ''
+    });
+
+    // Optionally acknowledge in Telegram thread
+    try {
+      const ack = `✅ Reply sent to ${escapeMarkdownV2(toEmail)}`;
+      await sendTelegramMessage(TELEGRAM_BOT_TOKEN, telegramChatId, ack, { parse_mode: 'MarkdownV2' });
+    } catch (ackErr) {
+      console.error('[TELEGRAM] Acknowledgement failed:', ackErr && ackErr.message ? ackErr.message : ackErr);
+    }
+
+    return res.status(200).json({ ok: true, messageId: sent.messageId });
+  } catch (err) {
+    console.error('[TELEGRAM] Webhook handling error:', err && err.message ? err.message : err);
+    return res.status(500).json({ ok: false, error: err && err.message ? err.message : 'internal' });
+  }
 });
 
 app.post('/admin/api/messages/:id/reply', requireAdminAuth, async (req, res) => {

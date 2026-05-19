@@ -240,6 +240,36 @@ async function addReply(messageId, reply) {
   return fileStore.addReply(messageId, reply);
 }
 
+async function linkTelegramMessage(messageId, chatId, telegramMessageId) {
+  if (!messageId || !telegramMessageId) return null;
+  if (mongoDb) {
+    try {
+      const update = { $set: { 'telegram.chatId': String(chatId || ''), 'telegram.messageId': Number(telegramMessageId) } };
+      await mongoDb.collection('messages').updateOne({ id: messageId }, update);
+      const updated = await mongoDb.collection('messages').findOne({ id: messageId });
+      return updated;
+    } catch (err) {
+      console.error('[DB] MongoDB linkTelegramMessage error:', err.message);
+      return fileStore.linkTelegramMessage ? fileStore.linkTelegramMessage(messageId, chatId, telegramMessageId) : null;
+    }
+  }
+  return fileStore.linkTelegramMessage ? fileStore.linkTelegramMessage(messageId, chatId, telegramMessageId) : null;
+}
+
+async function findMessageByTelegramMessageId(chatId, telegramMessageId) {
+  if (!telegramMessageId) return null;
+  if (mongoDb) {
+    try {
+      const msg = await mongoDb.collection('messages').findOne({ 'telegram.messageId': Number(telegramMessageId), 'telegram.chatId': String(chatId || '') });
+      return msg || null;
+    } catch (err) {
+      console.error('[DB] MongoDB findMessageByTelegramMessageId error:', err.message);
+      return fileStore.findMessageByTelegramMessageId ? fileStore.findMessageByTelegramMessageId(chatId, telegramMessageId) : null;
+    }
+  }
+  return fileStore.findMessageByTelegramMessageId ? fileStore.findMessageByTelegramMessageId(chatId, telegramMessageId) : null;
+}
+
 module.exports = {
   connectToMongo,
   listMessages,
@@ -248,4 +278,6 @@ module.exports = {
   addInboundMessage,
   addOutboundMessage,
   addReply
+  , linkTelegramMessage,
+  findMessageByTelegramMessageId
 };

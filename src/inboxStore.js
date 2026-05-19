@@ -64,9 +64,40 @@ function readStore() {
   }
 }
 
+// Expose a private read helper for DB shim (used cautiously)
+function _readStore() {
+  return readStore();
+}
+
+function findMessageByTelegramMessageId(chatId, telegramMessageId) {
+  if (!telegramMessageId) return null;
+  const store = readStore();
+  const needle = String(telegramMessageId);
+  return store.messages.find(m => {
+    if (!m.telegram) return false;
+    const mid = m.telegram.messageId ? String(m.telegram.messageId) : '';
+    const cid = m.telegram.chatId ? String(m.telegram.chatId) : '';
+    return mid === needle && (String(chatId || '') === '' || cid === String(chatId));
+  }) || null;
+}
+
+function linkTelegramMessage(messageId, chatId, telegramMessageId) {
+  if (!messageId || !telegramMessageId) return null;
+  const store = readStore();
+  const idx = store.messages.findIndex(m => m.id === messageId);
+  if (idx === -1) return null;
+  store.messages[idx].telegram = store.messages[idx].telegram || {};
+  store.messages[idx].telegram.chatId = String(chatId || '');
+  store.messages[idx].telegram.messageId = Number(telegramMessageId);
+  writeStore(store);
+  return store.messages[idx];
+}
+
 function writeStore(store) {
   ensureStore();
-  fs.writeFileSync(STORE_FILE, JSON.stringify(store, null, 2), 'utf8');
+  const tempFile = `${STORE_FILE}.tmp`;
+  fs.writeFileSync(tempFile, JSON.stringify(store, null, 2), 'utf8');
+  fs.renameSync(tempFile, STORE_FILE);
 }
 
 function sortNewestFirst(messages) {
@@ -198,5 +229,9 @@ module.exports = {
   findMessageByMessageId,
   addInboundMessage,
   addOutboundMessage,
-  addReply
+  addReply,
+  // Telegram helpers
+  findMessageByTelegramMessageId,
+  linkTelegramMessage,
+  _readStore
 };
