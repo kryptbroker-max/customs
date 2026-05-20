@@ -23,3 +23,61 @@
 2026-05-19T23:30:51Z INF Registered tunnel connection connIndex=0 connection=fc8fbda7-4e18-4a03-aff7-41f6aecf342d event=0 ip=198.41.192.77 location=cdg15 protocol=quic
 2026-05-19T23:35:51Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp 127.0.0.1:3000: connect: connection refused" connIndex=0 event=1 ingressRule=0 originService=http://localhost:3000
 2026-05-19T23:35:51Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp 127.0.0.1:3000: connect: connection refused" connIndex=0 dest=https://wondering-arbor-synopsis-stats.trycloudflare.com/inbound/email event=0 ip=198.41.192.77 type=http
+2026-05-19T23:46:02Z ERR failed to run the datagram handler error="timeout: no recent network activity" connIndex=0 event=0 ip=198.41.192.77
+2026-05-19T23:46:02Z ERR failed to accept incoming stream requests error="failed to accept QUIC stream: timeout: no recent network activity" connIndex=0 event=0 ip=198.41.192.77
+2026-05-19T23:46:02Z ERR failed to serve tunnel connection error="datagram manager encountered a failure while serving" connIndex=0 event=0 ip=198.41.192.77
+2026-05-19T23:46:02Z ERR Serve tunnel error error="datagram manager encountered a failure while serving" connIndex=0 event=0 ip=198.41.192.77
+2026-05-19T23:46:02Z INF Retrying connection in up to 1s connIndex=0 event=0 ip=198.41.192.77
+2026-05-19T23:46:04Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.192.77
+2026-05-19T23:46:09Z ERR Failed to dial a quic connection error="failed to dial to edge with quic: timeout: no recent network activity" connIndex=0 event=0 ip=198.41.192.77
+2026-05-19T23:46:09Z INF Retrying connection in up to 4s connIndex=0 event=0 ip=198.41.192.77
+2026-05-19T23:46:11Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.192.167
+2026-05-19T23:46:16Z ERR Failed to dial a quic connection error="failed to dial to edge with quic: timeout: no recent network activity" connIndex=0 event=0 ip=198.41.192.167
+2026-05-19T23:46:16Z INF Retrying connection in up to 8s connIndex=0 event=0 ip=198.41.192.167
+2026-05-19T23:46:17Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.200.233
+2026-05-19T23:46:22Z ERR Failed to dial a quic connection error="failed to dial to edge with quic: timeout: no recent network activity" connIndex=0 event=0 ip=198.41.200.233
+2026-05-19T23:46:22Z INF Retrying connection in up to 16s connIndex=0 event=0 ip=198.41.200.233
+2026-05-19T23:46:33Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.200.43
+2026-05-19T23:46:38Z ERR Failed to dial a quic connection error="failed to dial to edge with quic: timeout: no recent network activity" connIndex=0 event=0 ip=198.41.200.43
+2026-05-19T23:46:38Z INF Retrying connection in up to 32s connIndex=0 event=0 ip=198.41.200.43
+2026-05-19T23:46:41Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.192.77
+2026-05-19T23:46:46Z ERR Failed to dial a quic connection error="failed to dial to edge with quic: timeout: no recent network activity" connIndex=0 event=0 ip=198.41.192.77
+2026-05-19T23:46:46Z INF Retrying connection in up to 1m4s connIndex=0 event=0 ip=198.41.192.77
+2026-05-19T23:46:58Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.192.57
+2026-05-19T23:47:03Z ERR Failed to dial a quic connection error="failed to dial to edge with quic: timeout: no recent network activity" connIndex=0 event=0 ip=198.41.192.57
+2026-05-19T23:47:03Z INF Retrying connection in up to 1m4s connIndex=0 event=0 ip=198.41.192.57
+2026-05-19T23:47:14Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.200.193
+2026-05-19T23:47:19Z ERR Failed to dial a quic connection error="failed to dial to edge with quic: timeout: no recent network activity" connIndex=0 event=0 ip=198.41.200.193
+2026-05-19T23:47:19Z INF Retrying connection in up to 1m4s connIndex=0 event=0 ip=198.41.200.193
+2026-05-19T23:47:43Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.192.67
+2026-05-19T23:47:48Z ERR Failed to dial a quic connection error="failed to dial to edge with quic: timeout: no recent network activity" connIndex=0 event=0 ip=198.41.192.67
+2026-05-19T23:47:48Z INF Retrying connection in up to 1m4s connIndex=0 event=0 ip=198.41.192.67
+2026-05-19T23:48:22Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.200.233
+2026-05-19T23:48:22Z ERR Failed to dial a quic connection error="failed to dial to edge with quic: write udp [::]:60901->198.41.200.233:7844: sendmsg: network is unreachable" connIndex=0 event=0 ip=198.41.200.233
+2026-05-19T23:48:22Z INF Retrying connection in up to 1m4s connIndex=0 event=0 ip=198.41.200.233
+2026-05-19T23:48:32Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.200.53
+2026-05-19T23:48:37Z ERR Failed to dial a quic connection error="failed to dial to edge with quic: timeout: no recent network activity" connIndex=0 event=0 ip=198.41.200.53
+2026-05-19T23:48:37Z INF Retrying connection in up to 1m4s connIndex=0 event=0 ip=198.41.200.53
+2026-05-19T23:48:46Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.192.47
+2026-05-19T23:48:51Z ERR Failed to dial a quic connection error="failed to dial to edge with quic: timeout: no recent network activity" connIndex=0 event=0 ip=198.41.192.47
+2026-05-19T23:48:51Z INF Retrying connection in up to 1m4s connIndex=0 event=0 ip=198.41.192.47
+2026-05-19T23:49:12Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.200.53
+2026-05-19T23:49:17Z ERR Failed to dial a quic connection error="failed to dial to edge with quic: timeout: no recent network activity" connIndex=0 event=0 ip=198.41.200.53
+2026-05-19T23:49:17Z INF Retrying connection in up to 1m4s connIndex=0 event=0 ip=198.41.200.53
+2026-05-19T23:49:21Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.192.27
+2026-05-19T23:49:26Z ERR Failed to dial a quic connection error="failed to dial to edge with quic: timeout: no recent network activity" connIndex=0 event=0 ip=198.41.192.27
+2026-05-19T23:49:26Z INF Retrying connection in up to 1m4s connIndex=0 event=0 ip=198.41.192.27
+2026-05-19T23:49:46Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.200.63
+2026-05-19T23:49:51Z ERR Failed to dial a quic connection error="failed to dial to edge with quic: timeout: no recent network activity" connIndex=0 event=0 ip=198.41.200.63
+2026-05-19T23:49:51Z INF Retrying connection in up to 1m4s connIndex=0 event=0 ip=198.41.200.63
+2026-05-19T23:50:15Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.200.233
+2026-05-19T23:50:20Z ERR Failed to dial a quic connection error="failed to dial to edge with quic: timeout: no recent network activity" connIndex=0 event=0 ip=198.41.200.233
+2026-05-19T23:50:20Z INF Retrying connection in up to 1m4s connIndex=0 event=0 ip=198.41.200.233
+2026-05-19T23:50:35Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.200.193
+2026-05-19T23:50:40Z ERR Failed to dial a quic connection error="failed to dial to edge with quic: timeout: no recent network activity" connIndex=0 event=0 ip=198.41.200.193
+2026-05-19T23:50:40Z INF Retrying connection in up to 1m4s connIndex=0 event=0 ip=198.41.200.193
+2026-05-19T23:51:08Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.200.13
+2026-05-19T23:51:08Z ERR Failed to dial a quic connection error="failed to dial to edge with quic: write udp [::]:60901->198.41.200.13:7844: sendmsg: network is unreachable" connIndex=0 event=0 ip=198.41.200.13
+2026-05-19T23:51:08Z INF Retrying connection in up to 1m4s connIndex=0 event=0 ip=198.41.200.13
+2026-05-19T23:51:21Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.200.193
+2026-05-19T23:51:23Z INF Registered tunnel connection connIndex=0 connection=63411a68-3f28-4686-80bf-c3662bb923c8 event=0 ip=198.41.200.193 location=cdg01 protocol=quic

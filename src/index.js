@@ -499,6 +499,10 @@ app.post('/inbound/email', webhookLimiter, async (req, res) => {
     let payloadForParse = req.body;
     try {
       const emailId = req.body && req.body.data && req.body.data.email_id ? req.body.data.email_id : null;
+      const webhookType = req.body && req.body.type ? req.body.type : 'unknown';
+      console.log(`[INBOUND] Webhook type: ${webhookType}, emailId: ${emailId}`);
+      console.log(`[INBOUND] Resend body keys:`, Object.keys(req.body && req.body.data ? req.body.data : {}));
+      
       if (emailId && req.body.type === 'email.received') {
         console.log(`[INBOUND] Fetching complete email object for ID: ${emailId}`);
         try {
