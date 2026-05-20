@@ -566,12 +566,7 @@ app.post('/inbound/email', webhookLimiter, async (req, res) => {
           console.log('[INBOUND] Telegram forward - hasBodyContent:', hasBodyContent, 'bodyLen:', body.length);
           const messageText = hasBodyContent
             ? `*From:* ${escapeMarkdownV2(saved.from || '')}\n*Subject:* ${escapeMarkdownV2(saved.subject || '')}\n\n${escapeMarkdownV2(body).substring(0, 4000)}`
-            : (function() {
-                const rawData = saved.raw && saved.raw.data ? saved.raw.data : saved.raw || {};
-                const rawPreview = escapeMarkdownV2(JSON.stringify(rawData, null, 2)).substring(0, 900);
-                const adminLink = `${PUBLIC_BASE_URL}/admin/api/messages/${saved.id}`;
-                return `*From:* ${escapeMarkdownV2(saved.from || '')}\n*Subject:* ${escapeMarkdownV2(saved.subject || '')}\n\n_Body omitted by provider_\n\nView in Admin API: ${escapeMarkdownV2(adminLink)}\n\nRaw payload preview:\n${rawPreview}`;
-              })();
+            : `📬 New Inbound Metadata Received!\nFrom: ${saved.from || ''}\nSubject: ${saved.subject || ''}\n[Body content omitted by webhook provider]`;
 
           console.log('[INBOUND] Sending Telegram message to chatId:', TELEGRAM_CHAT_ID);
           const result = hasBodyContent
